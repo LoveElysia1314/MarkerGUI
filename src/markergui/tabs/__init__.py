@@ -1,0 +1,3 @@
+"""
+Tabs module for MarkerGUI
+"""
