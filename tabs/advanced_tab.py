@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
     QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 def create_advanced_tab(parent):
     tab = QWidget()

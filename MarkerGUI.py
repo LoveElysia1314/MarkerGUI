@@ -2,13 +2,13 @@ import sys
 import json
 import os
 from pathlib import Path
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QGroupBox, QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox,
     QTextEdit, QFileDialog, QMessageBox, QSpinBox, QFormLayout, QInputDialog
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QIcon
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QIcon
 
 
 class ConfigManager:

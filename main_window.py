@@ -1,13 +1,13 @@
 import os
 import sys
 from pathlib import Path
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QGroupBox, QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox,
     QTextEdit, QFileDialog, QMessageBox, QSpinBox, QFormLayout, QInputDialog, QApplication
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 from config_manager import ConfigManager
 from tabs.basic_tab import create_basic_tab
 from tabs.ocr_tab import create_ocr_tab

@@ -1,8 +1,8 @@
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
     QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 def create_llm_tab(parent):
     tab = QWidget()
@@ -37,9 +37,22 @@ def create_llm_tab(parent):
     service_group.setLayout(service_layout)
     layout.addWidget(service_group)
     
+    # 隐藏所有服务控件组
+    def toggle_service_visibility(index):
+        service_groups = [
+            gemini_group, vertex_group, ollama_group,
+            claude_group, openai_group
+        ]
+        for i, group in enumerate(service_groups):
+            group.setVisible(i == index)
+
+    # 监听服务选择变化
+    parent.llm_service.currentIndexChanged.connect(toggle_service_visibility)
+    
     # Gemini设置
     gemini_group = QGroupBox("Google Gemini设置")
     gemini_layout = QFormLayout()
+    gemini_group.setVisible(False)
     
     parent.gemini_api_key = QLineEdit()
     gemini_layout.addRow("API密钥:", parent.gemini_api_key)
@@ -52,6 +65,7 @@ def create_llm_tab(parent):
     # Vertex设置
     vertex_group = QGroupBox("Google Vertex设置")
     vertex_layout = QFormLayout()
+    vertex_group.setVisible(False)
     
     parent.vertex_project_id = QLineEdit()
     vertex_layout.addRow("项目ID:", parent.vertex_project_id)
@@ -64,6 +78,7 @@ def create_llm_tab(parent):
     # Ollama设置
     ollama_group = QGroupBox("Ollama设置")
     ollama_layout = QFormLayout()
+    ollama_group.setVisible(False)
     
     parent.ollama_base_url = QLineEdit("http://localhost:11434")
     ollama_layout.addRow("基础URL:", parent.ollama_base_url)
@@ -76,6 +91,7 @@ def create_llm_tab(parent):
     # Claude设置
     claude_group = QGroupBox("Claude设置")
     claude_layout = QFormLayout()
+    claude_group.setVisible(False)
     
     parent.claude_api_key = QLineEdit()
     claude_layout.addRow("API密钥:", parent.claude_api_key)
@@ -88,6 +104,7 @@ def create_llm_tab(parent):
     # OpenAI设置
     openai_group = QGroupBox("OpenAI设置")
     openai_layout = QFormLayout()
+    openai_group.setVisible(False)
     
     parent.openai_api_key = QLineEdit()
     openai_layout.addRow("API密钥:", parent.openai_api_key)
@@ -98,6 +115,9 @@ def create_llm_tab(parent):
     
     openai_group.setLayout(openai_layout)
     layout.addWidget(openai_group)
+    
+    # 默认显示第一个服务的控件组
+    toggle_service_visibility(0)
     
     # LLM高级选项
     advanced_group = QGroupBox("LLM高级选项")

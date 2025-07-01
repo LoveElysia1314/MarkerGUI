@@ -1,7 +1,7 @@
 import os
 import json
 from pathlib import Path
-from PyQt6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 class ConfigManager:
     CONFIG_DIR = os.path.join(str(Path.home()), ".marker_gui")
