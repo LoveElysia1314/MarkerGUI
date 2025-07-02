@@ -1,6 +1,5 @@
 import os
 import sys
-import subprocess
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
@@ -122,157 +121,167 @@ class MarkerGUI(QMainWindow):
 
 
     def generate_command(self):
-        command = ""
-        
-        # 输入路径
-        input_path = self.input_path.text().strip()
-        if not input_path:
-            self.command_output.setText("错误: 请选择输入文件或目录")
-            return
-        
-        # 确定是单文件还是批量处理
-        if Path(input_path).is_dir():
+        try:
+            command = ""
+            input_path = self.input_path.text().strip()
+            
+            # 确定是单文件还是批量处理
+            if Path(input_path).is_dir():
+                command += "marker "
+            else:
+                command += "marker_single "
+            
+            command += f'"{input_path}"'
+            
+            # 输出目录
+            output_dir = self.output_dir.text().strip()
+            if output_dir:
+                command += f' --output_dir "{output_dir}"'
+            
+            # 输出格式
+            output_format = self.output_format.currentText()
+            if output_format != "markdown":
+                command += f' --output_format {output_format}'
+            
+            # 页面范围
+            page_range = self.page_range.text().strip()
+            if page_range:
+                command += f' --page_range "{page_range}"'
+            
+            # 基本选项
+            if self.paginate_output.isChecked():
+                command += " --paginate_output"
+            if self.disable_image_extraction.isChecked():
+                command += " --disable_image_extraction"
+            if self.debug_mode.isChecked():
+                command += " --debug"
+            if self.disable_multiprocessing.isChecked():
+                command += " --disable_multiprocessing"
+            
+            # PDF文本提取工作进程数
+            pdftext_workers = self.pdftext_workers.value()
+            if pdftext_workers != 4:
+                command += f' --pdftext_workers {pdftext_workers}'
+            
+            # OCR选项
+            if self.format_lines.isChecked():
+                command += " --format_lines"
+            if self.force_ocr.isChecked():
+                command += " --force_ocr"
+            if self.strip_existing_ocr.isChecked():
+                command += " --strip_existing_ocr"
+            
+            # OCR任务模式
+            ocr_task = self.ocr_task_name.currentText()
+            if ocr_task != "ocr_with_boxes":
+                command += f' --ocr_task_name {ocr_task}'
+            if self.disable_ocr_math.isChecked():
+                command += " --disable_ocr_math"
+            if self.drop_repeated_text.isChecked():
+                command += " --drop_repeated_text"
+            
+            # 转换器设置
+            converter_cls = self.converter_cls.currentText()
+            if "TableConverter" in converter_cls:
+                command += ' --converter_cls marker.converters.table.TableConverter'
+            elif "OCRConverter" in converter_cls:
+                command += ' --converter_cls marker.converters.ocr.OCRConverter'
+            elif "ExtractionConverter" in converter_cls:
+                command += ' --converter_cls marker.converters.extraction.ExtractionConverter'
+            
+            force_layout = self.force_layout_block.text().strip()
+            if force_layout:
+                command += f' --force_layout_block {force_layout}'
+            
+            # LLM选项
+            if self.use_llm.isChecked():
+                command += " --use_llm"
+                
+                if self.redo_inline_math.isChecked():
+                    command += " --redo_inline_math"
+                
+                # LLM服务配置
+                service = self.llm_service.currentText()
+                if "Vertex" in service:
+                    command += ' --llm_service marker.services.vertex.GoogleVertexService'
+                    if self.vertex_project_id.text().strip():
+                        command += f' --vertex_project_id "{self.vertex_project_id.text().strip()}"'
+                    if self.vertex_location.text().strip():
+                        command += f' --vertex_location "{self.vertex_location.text().strip()}"'
+                elif "Ollama" in service:
+                    command += ' --llm_service marker.services.ollama.OllamaService'
+                    if self.ollama_base_url.text().strip():
+                        command += f' --ollama_base_url "{self.ollama_base_url.text().strip()}"'
+                    if self.ollama_model.text().strip():
+                        command += f' --ollama_model "{self.ollama_model.text().strip()}"'
+                elif "Claude" in service:
+                    command += ' --llm_service marker.services.claude.ClaudeService'
+                    if self.claude_api_key.text().strip():
+                        command += f' --claude_api_key "{self.claude_api_key.text().strip()}"'
+                    if self.claude_model_name.text().strip():
+                        command += f' --claude_model_name "{self.claude_model_name.text().strip()}"'
+                elif "OpenAI" in service:
+                    command += ' --llm_service marker.services.openai.OpenAIService'
+                    if self.openai_api_key.text().strip():
+                        command += f' --openai_api_key "{self.openai_api_key.text().strip()}"'
+                    if self.openai_model.text().strip():
+                        command += f' --openai_model "{self.openai_model.text().strip()}"'
+                    if self.openai_base_url.text().strip():
+                        command += f' --openai_base_url "{self.openai_base_url.text().strip()}"'
+                else:  # Gemini
+                    if self.gemini_api_key.text().strip():
+                        command += f' --gemini_api_key "{self.gemini_api_key.text().strip()}"'
+                    if self.gemini_model_name.text().strip() != "gemini-2.0-flash":
+                        command += f' --gemini_model_name "{self.gemini_model_name.text().strip()}"'
+                
+                # LLM高级选项
+                if self.max_concurrency.value() != 3:
+                    command += f' --max_concurrency {self.max_concurrency.value()}'
+                if self.timeout.value() != 30:
+                    command += f' --timeout {self.timeout.value()}'
+                if self.max_retries.value() != 2:
+                    command += f' --max_retries {self.max_retries.value()}'
+            
+            # 高级选项 - 从AdvancedTab获取
+            advanced_tab = self.tabs.widget(3)  # 第4个标签页是AdvancedTab
+            if hasattr(advanced_tab, 'processors') and advanced_tab.processors:
+                processors = advanced_tab.processors.text().strip()
+                if processors:
+                    command += f' --processors "{processors}"'
+            
+            # 调试选项
+            if hasattr(advanced_tab, 'debug_data_folder') and advanced_tab.debug_data_folder:
+                debug_folder = advanced_tab.debug_data_folder.text().strip()
+                if debug_folder:
+                    command += f' --debug_data_folder "{debug_folder}"'
+            if hasattr(advanced_tab, 'debug_layout_images') and advanced_tab.debug_layout_images:
+                if advanced_tab.debug_layout_images.isChecked():
+                    command += " --debug_layout_images"
+            if hasattr(advanced_tab, 'debug_pdf_images') and advanced_tab.debug_pdf_images:
+                if advanced_tab.debug_pdf_images.isChecked():
+                    command += " --debug_pdf_images"
+            if hasattr(advanced_tab, 'debug_json') and advanced_tab.debug_json:
+                if advanced_tab.debug_json.isChecked():
+                    command += " --debug_json"
+            
+            # 多GPU设置
+            if hasattr(advanced_tab, 'num_devices') and advanced_tab.num_devices:
+                num_devices = advanced_tab.num_devices.value()
+                if num_devices > 1:
+                    num_workers = advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 1
+                    command = f'NUM_DEVICES={num_devices} NUM_WORKERS={num_workers} marker_chunk_convert "{input_path}" "{output_dir if output_dir else "output_dir"}"'
+            
+            self.command_output.setText(command)
+        except Exception as e:
+            QMessageBox.critical(self, "生成命令错误", f"发生错误: {str(e)}")
             command += "marker "
-        else:
-            command += "marker_single "
-        
-        command += f'"{input_path}"'
-        
-        # 输出目录
-        output_dir = self.output_dir.text().strip()
-        if output_dir:
-            command += f' --output_dir "{output_dir}"'
-        
-        # 输出格式
-        output_format = self.output_format.currentText()
-        if output_format != "markdown":
-            command += f' --output_format {output_format}'
-        
-        # 页面范围
-        page_range = self.page_range.text().strip()
-        if page_range:
-            command += f' --page_range "{page_range}"'
-        
-        # 基本选项
-        if self.paginate_output.isChecked():
-            command += " --paginate_output"
-        if self.disable_image_extraction.isChecked():
-            command += " --disable_image_extraction"
-        if self.debug_mode.isChecked():
-            command += " --debug"
-        if self.disable_multiprocessing.isChecked():
-            command += " --disable_multiprocessing"
-        
-        # PDF文本提取工作进程数
-        pdftext_workers = self.pdftext_workers.value()
-        if pdftext_workers != 4:
-            command += f' --pdftext_workers {pdftext_workers}'
-        
-        # OCR选项
-        if self.format_lines.isChecked():
-            command += " --format_lines"
-        if self.force_ocr.isChecked():
-            command += " --force_ocr"
-        if self.strip_existing_ocr.isChecked():
-            command += " --strip_existing_ocr"
-        
-        # OCR任务模式
-        ocr_task = self.ocr_task_name.currentText()
-        if ocr_task != "ocr_with_boxes":
-            command += f' --ocr_task_name {ocr_task}'
-        if self.disable_ocr_math.isChecked():
-            command += " --disable_ocr_math"
-        if self.drop_repeated_text.isChecked():
-            command += " --drop_repeated_text"
-        
-        # 转换器设置
-        converter_cls = self.converter_cls.currentText()
-        if "TableConverter" in converter_cls:
-            command += ' --converter_cls marker.converters.table.TableConverter'
-        elif "OCRConverter" in converter_cls:
-            command += ' --converter_cls marker.converters.ocr.OCRConverter'
-        elif "ExtractionConverter" in converter_cls:
-            command += ' --converter_cls marker.converters.extraction.ExtractionConverter'
-        
-        force_layout = self.force_layout_block.text().strip()
-        if force_layout:
-            command += f' --force_layout_block {force_layout}'
-        
-        # LLM选项
-        if self.use_llm.isChecked():
-            command += " --use_llm"
-            
-            if self.redo_inline_math.isChecked():
-                command += " --redo_inline_math"
-            
-            # LLM服务配置
-            service = self.llm_service.currentText()
-            if "Vertex" in service:
-                command += ' --llm_service marker.services.vertex.GoogleVertexService'
-                if self.vertex_project_id.text().strip():
-                    command += f' --vertex_project_id "{self.vertex_project_id.text().strip()}"'
-                if self.vertex_location.text().strip():
-                    command += f' --vertex_location "{self.vertex_location.text().strip()}"'
-            elif "Ollama" in service:
-                command += ' --llm_service marker.services.ollama.OllamaService'
-                if self.ollama_base_url.text().strip():
-                    command += f' --ollama_base_url "{self.ollama_base_url.text().strip()}"'
-                if self.ollama_model.text().strip():
-                    command += f' --ollama_model "{self.ollama_model.text().strip()}"'
-            elif "Claude" in service:
-                command += ' --llm_service marker.services.claude.ClaudeService'
-                if self.claude_api_key.text().strip():
-                    command += f' --claude_api_key "{self.claude_api_key.text().strip()}"'
-                if self.claude_model_name.text().strip():
-                    command += f' --claude_model_name "{self.claude_model_name.text().strip()}"'
-            elif "OpenAI" in service:
-                command += ' --llm_service marker.services.openai.OpenAIService'
-                if self.openai_api_key.text().strip():
-                    command += f' --openai_api_key "{self.openai_api_key.text().strip()}"'
-                if self.openai_model.text().strip():
-                    command += f' --openai_model "{self.openai_model.text().strip()}"'
-                if self.openai_base_url.text().strip():
-                    command += f' --openai_base_url "{self.openai_base_url.text().strip()}"'
-            else:  # Gemini
-                if self.gemini_api_key.text().strip():
-                    command += f' --gemini_api_key "{self.gemini_api_key.text().strip()}"'
-                if self.gemini_model_name.text().strip() != "gemini-2.0-flash":
-                    command += f' --gemini_model_name "{self.gemini_model_name.text().strip()}"'
-            
-            # LLM高级选项
-            if self.max_concurrency.value() != 3:
-                command += f' --max_concurrency {self.max_concurrency.value()}'
-            if self.timeout.value() != 30:
-                command += f' --timeout {self.timeout.value()}'
-            if self.max_retries.value() != 2:
-                command += f' --max_retries {self.max_retries.value()}'
-        
-        # 高级选项
-        processors = self.processors.text().strip()
-        if processors:
-            command += f' --processors "{processors}"'
-        
-        # 调试选项
-        if self.debug_data_folder.text().strip():
-            command += f' --debug_data_folder "{self.debug_data_folder.text().strip()}"'
-        if self.debug_layout_images.isChecked():
-            command += " --debug_layout_images"
-        if self.debug_pdf_images.isChecked():
-            command += " --debug_pdf_images"
-        if self.debug_json.isChecked():
-            command += " --debug_json"
-        
-        # 多GPU设置
-        if self.num_devices.value() > 1:
-            command = f'NUM_DEVICES={self.num_devices.value()} NUM_WORKERS={self.num_workers.value()} marker_chunk_convert "{input_path}" "{output_dir if output_dir else "output_dir"}"'
-        
-        self.command_output.setText(command)
-
     def copy_command(self):
         command = self.command_output.toPlainText()
         if command:
             QApplication.clipboard().setText(command)
             QMessageBox.information(self, "复制成功", "命令已复制到剪贴板")
+        else:
+            QMessageBox.warning(self, "复制错误", "没有可复制的命令")
             
     def run_command(self):
         """运行生成的命令"""
@@ -282,13 +291,17 @@ class MarkerGUI(QMainWindow):
             return
         
         try:
-            # 在Windows上使用cmd.exe执行命令
-            subprocess.Popen(f"cmd /c {command}", creationflags=subprocess.CREATE_NEW_CONSOLE)
+            # 将命令发送到VSCode终端
+            print(f"\n[MarkerGUI] 运行命令:\n{command}\n")
+            print("[MarkerGUI] 命令已发送到终端，请查看终端输出")
         except Exception as e:
             QMessageBox.critical(self, "运行错误", f"执行命令时出错: {str(e)}")
 
     def get_current_config(self):
         """获取当前UI配置数据"""
+        # 获取高级标签页
+        advanced_tab = self.tabs.widget(3)  # 第4个标签页是高级设置
+        
         return {
             "input_path": self.input_path.text(),
             "output_dir": self.output_dir.text(),
@@ -324,13 +337,17 @@ class MarkerGUI(QMainWindow):
             "max_concurrency": self.max_concurrency.value(),
             "timeout": self.timeout.value(),
             "max_retries": self.max_retries.value(),
-            "processors": self.processors.text(),
-            "num_devices": self.num_devices.value(),
-            "num_workers": self.num_workers.value(),
-            "debug_data_folder": self.debug_data_folder.text(),
-            "debug_layout_images": self.debug_layout_images.isChecked(),
-            "debug_pdf_images": self.debug_pdf_images.isChecked(),
-            "debug_json": self.debug_json.isChecked()
+            "processors": advanced_tab.processors.text() if hasattr(advanced_tab, 'processors') else "",
+            "num_devices": advanced_tab.num_devices.value() if hasattr(advanced_tab, 'num_devices') else 1,
+            "debug_data_folder": advanced_tab.debug_data_folder.text() if hasattr(advanced_tab, 'debug_data_folder') else "",
+            "debug_layout_images": advanced_tab.debug_layout_images.isChecked() if hasattr(advanced_tab, 'debug_layout_images') else False,
+            "debug_pdf_images": advanced_tab.debug_pdf_images.isChecked() if hasattr(advanced_tab, 'debug_pdf_images') else False,
+            "debug_json": advanced_tab.debug_json.isChecked() if hasattr(advanced_tab, 'debug_json') else False,
+            "num_workers": advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 15,
+            "debug_data_folder": advanced_tab.debug_data_folder.text() if hasattr(advanced_tab, 'debug_data_folder') else "",
+            "debug_layout_images": advanced_tab.debug_layout_images.isChecked() if hasattr(advanced_tab, 'debug_layout_images') else False,
+            "debug_pdf_images": advanced_tab.debug_pdf_images.isChecked() if hasattr(advanced_tab, 'debug_pdf_images') else False,
+            "debug_json": advanced_tab.debug_json.isChecked() if hasattr(advanced_tab, 'debug_json') else False
             }
     
 

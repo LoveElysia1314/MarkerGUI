@@ -1,28 +1,15 @@
+from .base_tab import BaseTab
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox,
-    QFormLayout, QScrollArea, QMessageBox, QInputDialog,
-    QSizePolicy  # 新增尺寸策略
+    QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton,
+    QComboBox, QCheckBox, QSpinBox, QFormLayout, QVBoxLayout
 )
 from PySide6.QtCore import Qt
 
-class AdvancedTab(QWidget):
+class AdvancedTab(BaseTab):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.config_manager = parent.config_manager
         self.main_window = parent
-        
-        # 创建滚动区域
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 禁用水平滚动条
-        
-        # 创建内容容器
-        content = QWidget()
-        content.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)  # 设置尺寸策略
-        layout = QVBoxLayout(content)
-        layout.setAlignment(Qt.AlignTop)  # 顶部对齐
-        scroll.setWidget(content)
         
         # 处理器设置
         processor_group = QGroupBox("处理器设置")
@@ -33,7 +20,7 @@ class AdvancedTab(QWidget):
         processor_layout.addRow(QLabel("格式: processor1,processor2,..."))
         
         processor_group.setLayout(processor_layout)
-        layout.addWidget(processor_group)
+        self.add_to_layout(processor_group)
         
         # 多GPU设置
         gpu_group = QGroupBox("多GPU设置")
@@ -56,7 +43,7 @@ class AdvancedTab(QWidget):
         gpu_layout.addRow(num_workers_layout)
         
         gpu_group.setLayout(gpu_layout)
-        layout.addWidget(gpu_group)
+        self.add_to_layout(gpu_group)
         
         # 调试设置
         debug_group = QGroupBox("调试设置")
@@ -75,7 +62,7 @@ class AdvancedTab(QWidget):
         debug_layout.addRow("调试选项:", debug_check_layout)
         
         debug_group.setLayout(debug_layout)
-        layout.addWidget(debug_group)
+        self.add_to_layout(debug_group)
         
         # 配置管理
         config_group = QGroupBox("配置管理")
@@ -102,13 +89,9 @@ class AdvancedTab(QWidget):
         config_layout.addRow(config_btn_layout)
         
         config_group.setLayout(config_layout)
-        layout.addWidget(config_group)
+        self.add_to_layout(config_group)
         
-        layout.addStretch()
-        
-        # 设置主布局
-        self.setLayout(QVBoxLayout())
-        self.layout().addWidget(scroll)
+        self.add_stretch()
     
     def refresh_config_list(self):
         """刷新配置列表"""
