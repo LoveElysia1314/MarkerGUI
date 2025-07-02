@@ -4,112 +4,74 @@ from pathlib import Path
 from PySide6.QtWidgets import QMessageBox
 
 class ConfigManager:
-    CONFIG_DIR = os.path.join(str(Path.home()), ".marker_gui")
-    PRESET_DIR = os.path.join(CONFIG_DIR, "presets")
-    USER_DIR = os.path.join(CONFIG_DIR, "user_configs")
+    CONFIG_DIR = "config"
+    DEFAULT_PRESET_FILE = os.path.join(CONFIG_DIR, "default.json")
     
     def __init__(self):
-        self.create_directories()
-        self.load_presets()
-        
-    def create_directories(self):
-        """创建必要的配置目录"""
-        os.makedirs(self.PRESET_DIR, exist_ok=True)
-        os.makedirs(self.USER_DIR, exist_ok=True)
+        self.presets = self.load_default_presets()
+        self.current_config = {}
     
-    def load_presets(self):
-        """加载预设配置"""
-        self.presets = {
-            "默认配置": {},
-            "高质量转换": {
-                "use_llm": True,
-                "format_lines": True,
-                "redo_inline_math": True
-            },
-            "表格提取": {
-                "converter_cls": "marker.converters.table.TableConverter",
-                "output_format": "json",
-                "force_layout_block": "Table"
-            },
-            "纯OCR处理": {
-                "converter_cls": "marker.converters.ocr.OCRConverter",
-                "force_ocr": True
-            }
-        }
+    def load_default_presets(self):
+        """从default.json加载预设配置"""
+        if not os.path.exists(self.DEFAULT_PRESET_FILE):
+            return {}
         
-        # 保存预设到文件
-        for name, config in self.presets.items():
-            preset_path = os.path.join(self.PRESET_DIR, f"{name}.json")
-            if not os.path.exists(preset_path):
-                with open(preset_path, 'w') as f:
-                    json.dump(config, f, indent=4)
-    
-    def get_user_configs(self):
-        """获取用户保存的所有配置"""
-        configs = {}
-        if os.path.exists(self.USER_DIR):
-            for file in os.listdir(self.USER_DIR):
-                if file.endswith(".json"):
-                    name = file[:-5]  # 移除.json扩展名
-                    configs[name] = os.path.join(self.USER_DIR, file)
-        return configs
-    
-    def get_all_configs(self):
-        """获取所有可用配置（预设+用户）"""
-        all_configs = {}
-        
-        # 添加预设配置
-        for name in self.presets.keys():
-            all_configs[name] = os.path.join(self.PRESET_DIR, f"{name}.json")
-        
-        # 添加用户配置
-        all_configs.update(self.get_user_configs())
-        return all_configs
-    
-    def save_config(self, config_name, config_data):
-        """保存配置到用户目录"""
-        # 检查是否覆盖系统预设
-        if config_name in self.presets:
-            reply = QMessageBox.question(
-                None, "覆盖预设", 
-                f"'{config_name}' 是一个系统预设配置。\n您确定要覆盖它吗？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.No:
-                return False
-            config_path = os.path.join(self.PRESET_DIR, f"{config_name}.json")
-        else:
-            config_path = os.path.join(self.USER_DIR, f"{config_name}.json")
-        
-        # 检查文件是否存在
-        if os.path.exists(config_path):
-            reply = QMessageBox.question(
-                None, "覆盖配置", 
-                f"配置 '{config_name}' 已存在。\n您确定要覆盖它吗？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.No:
-                return False
-        
-        # 保存配置
         try:
-            with open(config_path, 'w') as f:
-                json.dump(config_data, f, indent=4)
-            return True
-        except Exception as e:
-            QMessageBox.critical(None, "保存失败", f"保存配置时出错: {str(e)}")
-            return False
-    
-    def load_config(self, config_name):
-        """从文件加载配置"""
-        all_configs = self.get_all_configs()
-        if config_name not in all_configs:
-            return None
-        
-        config_path = all_configs[config_name]
-        try:
-            with open(config_path, 'r') as f:
+            with open(self.DEFAULT_PRESET_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
-            QMessageBox.critical(None, "加载失败", f"加载配置时出错: {str(e)}")
-            return None
+            QMessageBox.critical(None, "配置错误", f"加载默认配置失败: {str(e)}")
+            return {}
+    
+    def get_available_presets(self):
+        """获取可用预设列表"""
+        return list(self.presets.keys())
+    
+    def load_preset(self, preset_name):
+        """加载指定预设"""
+        if preset_name not in self.presets:
+            QMessageBox.warning(None, "配置错误", f"预设 '{preset_name}' 不存在")
+            return False
+        
+        self.current_config = self.presets[preset_name].get("settings", {})
+        return True
+    
+    def save_preset(self, preset_name, config_data, description="", overwrite=False):
+        """保存当前配置为新预设"""
+        if preset_name in self.presets and not overwrite:
+            reply = QMessageBox.question(
+                None, "覆盖预设",
+                f"预设 '{preset_name}' 已存在。是否覆盖？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return False
+        
+        # 更新预设
+        self.presets[preset_name] = {
+            "description": description,
+            "settings": config_data
+        }
+        
+        # 保存到文件
+        try:
+            with open(self.DEFAULT_PRESET_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.presets, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            QMessageBox.critical(None, "保存失败", f"保存预设时出错: {str(e)}")
+            return False
+    
+    def reset_to_default(self):
+        """重置为默认预设"""
+        if "default" in self.presets:
+            return self.load_preset("default")
+        return False
+    
+    def get_current_config(self):
+        """获取当前配置"""
+        return self.current_config
+    
+    def update_config(self, key, value):
+        """更新当前配置项"""
+        self.current_config[key] = value

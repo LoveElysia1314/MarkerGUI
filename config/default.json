@@ -1,0 +1,34 @@
+{
+  "default": {
+    "description": "默认配置",
+    "settings": {
+      "output_format": "markdown",
+      "disable_image_extraction": false,
+      "use_llm": false
+    }
+  },
+  "high_quality": {
+    "description": "高质量转换",
+    "settings": {
+      "output_format": "markdown",
+      "use_llm": true,
+      "llm_service": "Google Gemini",
+      "gemini_model_name": "gemini-2.0-flash"
+    }
+  },
+  "table_extraction": {
+    "description": "表格提取",
+    "settings": {
+      "converter_cls": "marker.converters.table.TableConverter",
+      "disable_image_extraction": true
+    }
+  },
+  "pure_ocr": {
+    "description": "纯OCR处理",
+    "settings": {
+      "converter_cls": "marker.converters.ocr.OCRConverter",
+      "force_ocr": true,
+      "use_llm": false
+    }
+  }
+}

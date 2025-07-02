@@ -1,13 +1,18 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
-    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout
+    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea
 )
 from PySide6.QtCore import Qt
 
 def create_ocr_tab(parent):
-    tab = QWidget()
-    layout = QVBoxLayout()
-    tab.setLayout(layout)
+    # 创建滚动区域
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    
+    # 创建内容容器
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    scroll.setWidget(content)
     
     # OCR引擎设置
     engine_group = QGroupBox("OCR引擎设置")
@@ -141,4 +146,4 @@ def create_ocr_tab(parent):
     layout.addWidget(post_group)
     
     layout.addStretch()
-    return tab
+    return scroll

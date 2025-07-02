@@ -1,14 +1,22 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
-    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout
+    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea,QSizePolicy
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 def create_basic_tab(parent):
-    tab = QWidget()
-    layout = QVBoxLayout()
-    tab.setLayout(layout)
+    # 创建滚动区域
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 禁用水平滚动条
+    
+    # 创建内容容器
+    content = QWidget()
+    content.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)  # 设置尺寸策略
+    layout = QVBoxLayout(content)
+    layout.setAlignment(Qt.AlignTop)  # 顶部对齐
+    scroll.setWidget(content)
     
     # 输入设置
     input_group = QGroupBox("输入设置")
@@ -133,4 +141,4 @@ def create_basic_tab(parent):
     layout.addWidget(converter_group)
     
     layout.addStretch()
-    return tab
+    return scroll

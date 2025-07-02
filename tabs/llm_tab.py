@@ -1,13 +1,18 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
-    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout
+    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea
 )
 from PySide6.QtCore import Qt
 
 def create_llm_tab(parent):
-    tab = QWidget()
-    layout = QVBoxLayout()
-    tab.setLayout(layout)
+    # 创建滚动区域
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    
+    # 创建内容容器
+    content = QWidget()
+    layout = QVBoxLayout(content)
+    scroll.setWidget(content)
     
     # LLM服务设置
     service_group = QGroupBox("LLM服务设置")
@@ -151,4 +156,4 @@ def create_llm_tab(parent):
     layout.addWidget(advanced_group)
     
     layout.addStretch()
-    return tab
+    return scroll

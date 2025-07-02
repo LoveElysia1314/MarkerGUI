@@ -127,7 +127,7 @@ class MarkerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Marker Document Converter")
-        self.setGeometry(100, 100, 500, 400)
+        self.setGeometry(100, 100, 400, 400)
         
         # 初始化配置管理器
         self.config_manager = ConfigManager()
