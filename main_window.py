@@ -4,76 +4,223 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QGroupBox, QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox,
-    QTextEdit, QFileDialog, QMessageBox, QSpinBox, QFormLayout, QInputDialog, QApplication
+    QTextEdit, QFileDialog, QMessageBox, QSpinBox, QFormLayout, QInputDialog, QApplication, QSplitter
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, QProcess, QThread, QObject
 from PySide6.QtGui import QFont
 from config_manager import ConfigManager
 from tabs.basic_tab import create_basic_tab
 from tabs.ocr_tab import create_ocr_tab
 from tabs.llm_tab import create_llm_tab
-from tabs.advanced_tab import AdvancedTab  # 更新导入
+from tabs.advanced_tab import AdvancedTab
+from command_generator import generate_command
+from utils import EmittingStream
+
+class CommandWorker(QObject):
+    """异步执行命令的工作线程"""
+    output = Signal(str)
+    finished = Signal(int)
+    error = Signal(str)
+    
+    def __init__(self, command):
+        super().__init__()
+        self.command = command
+        self.process = None
+    
+    def run(self):
+        """执行命令并捕获输出"""
+        try:
+            self.process = QProcess()
+            self.process.readyReadStandardOutput.connect(self.handle_output)
+            self.process.readyReadStandardError.connect(self.handle_error)
+            self.process.finished.connect(self.handle_finished)
+            
+            # 在Windows上使用cmd.exe执行命令
+            self.process.start("cmd.exe", ["/c", self.command])
+            if not self.process.waitForStarted():
+                self.error.emit("无法启动命令进程")
+                return
+                
+            # 等待命令完成（使用事件循环）
+            self.process.waitForFinished(-1)
+                
+        except Exception as e:
+            self.error.emit(str(e))
+    
+    def handle_output(self):
+        """处理标准输出"""
+        output = self.process.readAllStandardOutput().data().decode().strip()
+        if output:
+            self.output.emit(output)
+    
+    def handle_error(self):
+        """处理错误输出"""
+        error = self.process.readAllStandardError().data().decode().strip()
+        if error:
+            self.error.emit(error)
+    
+    def handle_finished(self, exit_code):
+        """命令执行完成"""
+        self.finished.emit(exit_code)
+        
+    def terminate(self):
+        """终止命令执行"""
+        if self.process and self.process.state() == QProcess.Running:
+            self.process.terminate()
 
 class MarkerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Marker Document Converter")
-        # 设置初始最小宽度，允许根据内容自动调整
-        self.setMinimumWidth(400)
+        # 设置初始最小尺寸
+        self.setMinimumWidth(800)
         self.setMinimumHeight(400)
         
         # 初始化配置管理器
         self.config_manager = ConfigManager()
+        self.worker = None  # 异步工作线程
+        self.thread = None  # QThread实例
         
-        # 创建主布局
-        main_widget = QWidget()
-        main_layout = QVBoxLayout()
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
+        # 创建主分割器（水平3:2）
+        main_splitter = QSplitter(Qt.Horizontal)
+        self.setCentralWidget(main_splitter)
         
-        # 创建标签页
+        # 左面板（60%）
+        left_widget = QWidget()
+        left_layout = QVBoxLayout()
+        left_widget.setLayout(left_layout)
+        
+        # 右面板（40%）
+        right_widget = QWidget()
+        right_layout = QVBoxLayout()
+        right_widget.setLayout(right_layout)
+        
+        # 添加左右面板到主分割器
+        main_splitter.addWidget(left_widget)
+        main_splitter.addWidget(right_widget)
+        main_splitter.setSizes([600, 400])  # 初始比例3:2
+        
+        # 左面板垂直分割（上功能区40%，下功能区60%）
+        left_splitter = QSplitter(Qt.Vertical)
+        left_layout.addWidget(left_splitter)
+        
+        # 上功能区：命令行输出
+        console_group = QGroupBox("命令行输出")
+        console_layout = QVBoxLayout()
+        self.console_output = QTextEdit()
+        self.console_output.setReadOnly(True)
+        self.console_output.setFont(QFont("Courier New", 9))
+        console_layout.addWidget(self.console_output)
+        
+        # 控制按钮
+        control_btn_layout = QHBoxLayout()
+        self.clear_btn = QPushButton("清除命令行")
+        self.clear_btn.clicked.connect(self.clear_console)
+        self.stop_btn = QPushButton("终止运行")
+        self.stop_btn.clicked.connect(self.stop_command)
+        control_btn_layout.addWidget(self.clear_btn)
+        control_btn_layout.addWidget(self.stop_btn)
+        console_layout.addLayout(control_btn_layout)
+        
+        console_group.setLayout(console_layout)
+        left_splitter.addWidget(console_group)
+        
+        # 下功能区：生成的命令
+        command_group = QGroupBox("生成的命令")
+        command_layout = QVBoxLayout()
+        self.command_output = QTextEdit()
+        self.command_output.setReadOnly(True)
+        self.command_output.setFont(QFont("Courier New", 10))
+        self.command_output.setLineWrapMode(QTextEdit.WidgetWidth)
+        command_layout.addWidget(self.command_output)
+        
+        # 命令组按钮（在文本控件下方）
+        command_btn_layout = QHBoxLayout()
+        self.generate_btn = QPushButton("生成命令")
+        self.generate_btn.clicked.connect(self.generate_command)
+        self.copy_btn = QPushButton("复制命令")
+        self.copy_btn.clicked.connect(self.copy_command)
+        self.run_btn = QPushButton("运行命令")
+        self.run_btn.clicked.connect(self.run_command)
+        command_btn_layout.addWidget(self.generate_btn)
+        command_btn_layout.addWidget(self.copy_btn)
+        command_btn_layout.addWidget(self.run_btn)
+        
+        command_layout.addLayout(command_btn_layout)
+        command_group.setLayout(command_layout)
+        left_splitter.addWidget(command_group)
+        
+        # 输入和输出设置 (从基本设置页移出)
+        input_output_group = QGroupBox("输入和输出设置")
+        input_output_layout = QFormLayout()
+        
+        self.input_path = QLineEdit()
+        self.browse_input_btn = QPushButton("浏览...")
+        self.browse_input_btn.clicked.connect(lambda: self.browse_input("file"))
+        self.browse_folder_btn = QPushButton("浏览文件夹...")
+        self.browse_folder_btn.clicked.connect(lambda: self.browse_input("folder"))
+        
+        input_output_layout.addRow("输入文件/目录:", self.create_h_widget([
+            self.input_path, 
+            self.browse_input_btn, 
+            self.browse_folder_btn
+        ]))
+        
+        self.output_dir = QLineEdit()
+        self.browse_output_btn = QPushButton("浏览...")
+        self.browse_output_btn.clicked.connect(self.browse_output)
+        input_output_layout.addRow("输出目录:", self.create_h_widget([
+            self.output_dir, 
+            self.browse_output_btn
+        ]))
+        
+        self.output_format = QComboBox()
+        self.output_format.addItems(["markdown", "text", "json"])
+        input_output_layout.addRow("输出格式:", self.output_format)
+        
+        self.page_range = QLineEdit()
+        input_output_layout.addRow("页面范围 (如 1-5,8):", self.page_range)
+        
+        input_output_group.setLayout(input_output_layout)
+        left_splitter.addWidget(input_output_group)
+        
+        # 调整分割器大小比例 (3:2:2)
+        left_splitter.setSizes([600, 400, 400])  
+        
+        # 右面板：标签页
         self.tabs = QTabWidget()
-        main_layout.addWidget(self.tabs)
+        right_layout.addWidget(self.tabs)
         
-        # 添加标签页
+        # 添加标签页 (移除基本设置页中的输入输出控件)
         self.tabs.addTab(create_basic_tab(self), "基本设置")
         self.tabs.addTab(create_ocr_tab(self), "OCR设置")
         self.tabs.addTab(create_llm_tab(self), "LLM设置")
         self.tabs.addTab(AdvancedTab(self), "高级设置")
         
-        # 命令输出区域
-        output_group = QGroupBox("生成的命令")
-        output_layout = QVBoxLayout()
-        self.command_output = QTextEdit()
-        self.command_output.setReadOnly(True)
-        self.command_output.setFont(QFont("Courier New", 10))
-        self.command_output.setLineWrapMode(QTextEdit.WidgetWidth)  # 设置自动换行，避免水平滚动条
-        output_layout.addWidget(self.command_output)
-        output_group.setLayout(output_layout)
-        main_layout.addWidget(output_group)
+        # 初始化输出重定向
+        self.init_output_redirection()
         
-        # 底部按钮（保留必要功能）
-        button_layout = QHBoxLayout()
-        self.generate_btn = QPushButton("生成命令")
-        self.generate_btn.clicked.connect(self.generate_command)
-        self.copy_btn = QPushButton("复制命令")
-        self.copy_btn.clicked.connect(self.copy_command)
-        
-        button_layout.addWidget(self.generate_btn)
-        button_layout.addWidget(self.copy_btn)
-        self.run_btn = QPushButton("运行命令")
-        self.run_btn.clicked.connect(self.run_command)
-        button_layout.addWidget(self.run_btn)
-        
-        main_layout.addLayout(button_layout)
-        # 初始化UI状态
-        # 初始化配置为默认值
+        # 初始化配置
         self.config_manager.reset_to_default()
         self.toggle_llm_options(False)
         
         # 添加自适应宽度逻辑
         self.adjustSize()
-
+        
+    def init_output_redirection(self):
+        """初始化输出重定向到命令行控件"""
+        self.output_stream = EmittingStream()
+        sys.stdout = self.output_stream
+        self.output_stream.textWritten.connect(self.handle_console_output)
+        
+    def handle_console_output(self, text):
+        """处理控制台输出"""
+        self.console_output.append(text)  # 直接附加文本，无颜色格式化
+        
+    def clear_console(self):
+        """清除命令行输出"""
+        self.console_output.clear()
+        
     def create_h_widget(self, widgets):
         widget = QWidget()
         layout = QHBoxLayout()
@@ -117,185 +264,65 @@ class MarkerGUI(QMainWindow):
         if path:
             self.output_dir.setText(path)
 
-    # 移除不再使用的配置管理方法
-
-
     def generate_command(self):
-        try:
-            command = ""
-            input_path = self.input_path.text().strip()
-            
-            # 确定是单文件还是批量处理
-            if Path(input_path).is_dir():
-                command += "marker "
-            else:
-                command += "marker_single "
-            
-            command += f'"{input_path}"'
-            
-            # 输出目录
-            output_dir = self.output_dir.text().strip()
-            if output_dir:
-                command += f' --output_dir "{output_dir}"'
-            
-            # 输出格式
-            output_format = self.output_format.currentText()
-            if output_format != "markdown":
-                command += f' --output_format {output_format}'
-            
-            # 页面范围
-            page_range = self.page_range.text().strip()
-            if page_range:
-                command += f' --page_range "{page_range}"'
-            
-            # 基本选项
-            if self.paginate_output.isChecked():
-                command += " --paginate_output"
-            if self.disable_image_extraction.isChecked():
-                command += " --disable_image_extraction"
-            if self.debug_mode.isChecked():
-                command += " --debug"
-            if self.disable_multiprocessing.isChecked():
-                command += " --disable_multiprocessing"
-            
-            # PDF文本提取工作进程数
-            pdftext_workers = self.pdftext_workers.value()
-            if pdftext_workers != 4:
-                command += f' --pdftext_workers {pdftext_workers}'
-            
-            # OCR选项
-            if self.format_lines.isChecked():
-                command += " --format_lines"
-            if self.force_ocr.isChecked():
-                command += " --force_ocr"
-            if self.strip_existing_ocr.isChecked():
-                command += " --strip_existing_ocr"
-            
-            # OCR任务模式
-            ocr_task = self.ocr_task_name.currentText()
-            if ocr_task != "ocr_with_boxes":
-                command += f' --ocr_task_name {ocr_task}'
-            if self.disable_ocr_math.isChecked():
-                command += " --disable_ocr_math"
-            if self.drop_repeated_text.isChecked():
-                command += " --drop_repeated_text"
-            
-            # 转换器设置
-            converter_cls = self.converter_cls.currentText()
-            if "TableConverter" in converter_cls:
-                command += ' --converter_cls marker.converters.table.TableConverter'
-            elif "OCRConverter" in converter_cls:
-                command += ' --converter_cls marker.converters.ocr.OCRConverter'
-            elif "ExtractionConverter" in converter_cls:
-                command += ' --converter_cls marker.converters.extraction.ExtractionConverter'
-            
-            force_layout = self.force_layout_block.text().strip()
-            if force_layout:
-                command += f' --force_layout_block {force_layout}'
-            
-            # LLM选项
-            if self.use_llm.isChecked():
-                command += " --use_llm"
-                
-                if self.redo_inline_math.isChecked():
-                    command += " --redo_inline_math"
-                
-                # LLM服务配置
-                service = self.llm_service.currentText()
-                if "Vertex" in service:
-                    command += ' --llm_service marker.services.vertex.GoogleVertexService'
-                    if self.vertex_project_id.text().strip():
-                        command += f' --vertex_project_id "{self.vertex_project_id.text().strip()}"'
-                    if self.vertex_location.text().strip():
-                        command += f' --vertex_location "{self.vertex_location.text().strip()}"'
-                elif "Ollama" in service:
-                    command += ' --llm_service marker.services.ollama.OllamaService'
-                    if self.ollama_base_url.text().strip():
-                        command += f' --ollama_base_url "{self.ollama_base_url.text().strip()}"'
-                    if self.ollama_model.text().strip():
-                        command += f' --ollama_model "{self.ollama_model.text().strip()}"'
-                elif "Claude" in service:
-                    command += ' --llm_service marker.services.claude.ClaudeService'
-                    if self.claude_api_key.text().strip():
-                        command += f' --claude_api_key "{self.claude_api_key.text().strip()}"'
-                    if self.claude_model_name.text().strip():
-                        command += f' --claude_model_name "{self.claude_model_name.text().strip()}"'
-                elif "OpenAI" in service:
-                    command += ' --llm_service marker.services.openai.OpenAIService'
-                    if self.openai_api_key.text().strip():
-                        command += f' --openai_api_key "{self.openai_api_key.text().strip()}"'
-                    if self.openai_model.text().strip():
-                        command += f' --openai_model "{self.openai_model.text().strip()}"'
-                    if self.openai_base_url.text().strip():
-                        command += f' --openai_base_url "{self.openai_base_url.text().strip()}"'
-                else:  # Gemini
-                    if self.gemini_api_key.text().strip():
-                        command += f' --gemini_api_key "{self.gemini_api_key.text().strip()}"'
-                    if self.gemini_model_name.text().strip() != "gemini-2.0-flash":
-                        command += f' --gemini_model_name "{self.gemini_model_name.text().strip()}"'
-                
-                # LLM高级选项
-                if self.max_concurrency.value() != 3:
-                    command += f' --max_concurrency {self.max_concurrency.value()}'
-                if self.timeout.value() != 30:
-                    command += f' --timeout {self.timeout.value()}'
-                if self.max_retries.value() != 2:
-                    command += f' --max_retries {self.max_retries.value()}'
-            
-            # 高级选项 - 从AdvancedTab获取
-            advanced_tab = self.tabs.widget(3)  # 第4个标签页是AdvancedTab
-            if hasattr(advanced_tab, 'processors') and advanced_tab.processors:
-                processors = advanced_tab.processors.text().strip()
-                if processors:
-                    command += f' --processors "{processors}"'
-            
-            # 调试选项
-            if hasattr(advanced_tab, 'debug_data_folder') and advanced_tab.debug_data_folder:
-                debug_folder = advanced_tab.debug_data_folder.text().strip()
-                if debug_folder:
-                    command += f' --debug_data_folder "{debug_folder}"'
-            if hasattr(advanced_tab, 'debug_layout_images') and advanced_tab.debug_layout_images:
-                if advanced_tab.debug_layout_images.isChecked():
-                    command += " --debug_layout_images"
-            if hasattr(advanced_tab, 'debug_pdf_images') and advanced_tab.debug_pdf_images:
-                if advanced_tab.debug_pdf_images.isChecked():
-                    command += " --debug_pdf_images"
-            if hasattr(advanced_tab, 'debug_json') and advanced_tab.debug_json:
-                if advanced_tab.debug_json.isChecked():
-                    command += " --debug_json"
-            
-            # 多GPU设置
-            if hasattr(advanced_tab, 'num_devices') and advanced_tab.num_devices:
-                num_devices = advanced_tab.num_devices.value()
-                if num_devices > 1:
-                    num_workers = advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 1
-                    command = f'NUM_DEVICES={num_devices} NUM_WORKERS={num_workers} marker_chunk_convert "{input_path}" "{output_dir if output_dir else "output_dir"}"'
-            
+        """使用外部命令生成器生成命令"""
+        command = generate_command(self)
+        if command:
             self.command_output.setText(command)
-        except Exception as e:
-            QMessageBox.critical(self, "生成命令错误", f"发生错误: {str(e)}")
-            command += "marker "
+            
     def copy_command(self):
         command = self.command_output.toPlainText()
         if command:
             QApplication.clipboard().setText(command)
-            QMessageBox.information(self, "复制成功", "命令已复制到剪贴板")
+            print("[INFO] 复制成功: 命令已复制到剪贴板")
         else:
-            QMessageBox.warning(self, "复制错误", "没有可复制的命令")
+            print("[WORRY] 复制错误: 没有可复制的命令")
             
     def run_command(self):
-        """运行生成的命令"""
+        """异步运行生成的命令"""
         command = self.command_output.toPlainText().strip()
         if not command:
-            QMessageBox.warning(self, "错误", "没有可运行的命令")
+            print("[WORRY] 运行错误: 没有可运行的命令")
             return
         
-        try:
-            # 将命令发送到VSCode终端
-            print(f"\n[MarkerGUI] 运行命令:\n{command}\n")
-            print("[MarkerGUI] 命令已发送到终端，请查看终端输出")
-        except Exception as e:
-            QMessageBox.critical(self, "运行错误", f"执行命令时出错: {str(e)}")
+        # 创建并启动工作线程
+        self.worker = CommandWorker(command)
+        self.thread = QThread()
+        self.worker.moveToThread(self.thread)
+        
+        # 连接信号
+        self.worker.output.connect(self.handle_command_output)
+        self.worker.error.connect(self.handle_command_error)
+        self.worker.finished.connect(self.on_command_finished)
+        self.thread.started.connect(self.worker.run)
+        
+        print(f"[INFO] 开始执行命令: {command}")
+        self.thread.start()
+    
+    def handle_command_output(self, text):
+        """处理命令输出"""
+        print(text)
+    
+    def handle_command_error(self, error):
+        """处理命令错误"""
+        print(f"[ERROR] {error}")
+    
+    def on_command_finished(self, exit_code):
+        """命令执行完成"""
+        self.thread.quit()
+        self.thread.wait()
+        if exit_code == 0:
+            print("[INFO] 命令执行成功")
+        else:
+            print(f"[WORRY] 命令异常退出，代码: {exit_code}")
+    
+    def stop_command(self):
+        """终止正在运行的命令"""
+        if hasattr(self, 'worker') and self.worker:
+            self.worker.terminate()
+            print("[INFO] 命令运行已终止")
+        else:
+            print("[WORRY] 没有正在运行的命令")
 
     def get_current_config(self):
         """获取当前UI配置数据"""
@@ -344,13 +371,8 @@ class MarkerGUI(QMainWindow):
             "debug_pdf_images": advanced_tab.debug_pdf_images.isChecked() if hasattr(advanced_tab, 'debug_pdf_images') else False,
             "debug_json": advanced_tab.debug_json.isChecked() if hasattr(advanced_tab, 'debug_json') else False,
             "num_workers": advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 15,
-            "debug_data_folder": advanced_tab.debug_data_folder.text() if hasattr(advanced_tab, 'debug_data_folder') else "",
-            "debug_layout_images": advanced_tab.debug_layout_images.isChecked() if hasattr(advanced_tab, 'debug_layout_images') else False,
-            "debug_pdf_images": advanced_tab.debug_pdf_images.isChecked() if hasattr(advanced_tab, 'debug_pdf_images') else False,
-            "debug_json": advanced_tab.debug_json.isChecked() if hasattr(advanced_tab, 'debug_json') else False
-            }
+        }
     
-
     def save_config(self):
         # 获取当前配置名称
         current_config = self.preset_combo.currentText()
@@ -372,11 +394,11 @@ class MarkerGUI(QMainWindow):
             description=f"用户自定义配置: {config_name}",
             overwrite=True
         ):
-            QMessageBox.information(self, "保存成功", "配置已成功保存")
+            print("[INFO] 保存成功: 配置已成功保存")
             self.refresh_config_list()
             self.preset_combo.setCurrentText(config_name)
-
-
+        else:
+            print("[ERROR] 保存失败: 无法保存配置")
 
     def set_combo_text(self, combo, text):
         index = combo.findText(text)

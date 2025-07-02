@@ -18,39 +18,6 @@ def create_basic_tab(parent):
     layout.setAlignment(Qt.AlignTop)  # 顶部对齐
     scroll.setWidget(content)
     
-    # 输入设置
-    input_group = QGroupBox("输入设置")
-    input_layout = QFormLayout()
-    
-    parent.input_path = QLineEdit()
-    parent.browse_input_btn = QPushButton("浏览...")
-    parent.browse_input_btn.clicked.connect(lambda: parent.browse_input("file"))
-    parent.browse_folder_btn = QPushButton("浏览文件夹...")
-    parent.browse_folder_btn.clicked.connect(lambda: parent.browse_input("folder"))
-    
-    input_layout.addRow("输入文件/目录:", parent.create_h_widget([
-        parent.input_path, 
-        parent.browse_input_btn, 
-        parent.browse_folder_btn
-    ]))
-    
-    parent.output_dir = QLineEdit()
-    parent.browse_output_btn = QPushButton("浏览...")
-    parent.browse_output_btn.clicked.connect(parent.browse_output)
-    input_layout.addRow("输出目录:", parent.create_h_widget([
-        parent.output_dir, 
-        parent.browse_output_btn
-    ]))
-    
-    parent.output_format = QComboBox()
-    parent.output_format.addItems(["markdown", "text", "json"])
-    input_layout.addRow("输出格式:", parent.output_format)
-    
-    parent.page_range = QLineEdit()
-    input_layout.addRow("页面范围 (如 1-5,8):", parent.page_range)
-    
-    input_group.setLayout(input_layout)
-    layout.addWidget(input_group)
     
     # 基本选项
     basic_group = QGroupBox("基本选项")

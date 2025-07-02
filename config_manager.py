@@ -8,8 +8,54 @@ class ConfigManager:
     DEFAULT_PRESET_FILE = os.path.join(CONFIG_DIR, "default.json")
     
     def __init__(self):
+        # 确保配置文件存在
+        self.ensure_default_config()
         self.presets = self.load_default_presets()
         self.current_config = {}
+    
+    def ensure_default_config(self):
+        """确保默认配置文件存在，如果不存在则创建"""
+        if not os.path.exists(self.DEFAULT_PRESET_FILE):
+            config_dir = Path(self.CONFIG_DIR)
+            config_dir.mkdir(exist_ok=True)
+            
+            default_configs = {
+                "default": {
+                    "description": "默认配置",
+                    "settings": {
+                        "output_format": "markdown",
+                        "disable_image_extraction": False,
+                        "use_llm": False
+                    }
+                },
+                "high_quality": {
+                    "description": "高质量转换",
+                    "settings": {
+                        "output_format": "markdown",
+                        "use_llm": True,
+                        "llm_service": "Google Gemini",
+                        "gemini_model_name": "gemini-2.0-flash"
+                    }
+                },
+                "table_extraction": {
+                    "description": "表格提取",
+                    "settings": {
+                        "converter_cls": "marker.converters.table.TableConverter",
+                        "disable_image_extraction": True
+                    }
+                },
+                "pure_ocr": {
+                    "description": "纯OCR处理",
+                    "settings": {
+                        "converter_cls": "marker.converters.ocr.OCRConverter",
+                        "force_ocr": True,
+                        "use_llm": False
+                    }
+                }
+            }
+            
+            with open(self.DEFAULT_PRESET_FILE, 'w', encoding='utf-8') as f:
+                json.dump(default_configs, f, indent=2, ensure_ascii=False)
     
     def load_default_presets(self):
         """从default.json加载预设配置"""

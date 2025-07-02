@@ -30,10 +30,36 @@ class BaseTab(QWidget):
         self.layout.addWidget(group)
         return form_layout
     
+    def create_v_group(self, title):
+        """创建垂直布局组"""
+        group = QGroupBox(title)
+        v_layout = QVBoxLayout()
+        group.setLayout(v_layout)
+        self.layout.addWidget(group)
+        return v_layout
+    
+    def create_h_group(self, title):
+        """创建水平布局组"""
+        group = QGroupBox(title)
+        h_layout = QHBoxLayout()
+        group.setLayout(h_layout)
+        self.layout.addWidget(group)
+        return h_layout
+    
     def create_h_widget(self, widgets):
         """创建水平布局控件"""
         widget = QWidget()
         layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        for w in widgets:
+            layout.addWidget(w)
+        widget.setLayout(layout)
+        return widget
+    
+    def create_v_widget(self, widgets):
+        """创建垂直布局控件"""
+        widget = QWidget()
+        layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         for w in widgets:
             layout.addWidget(w)
@@ -47,3 +73,9 @@ class BaseTab(QWidget):
     def add_stretch(self):
         """添加伸缩空间"""
         self.layout.addStretch()
+    
+    def add_spacer(self, height=10):
+        """添加垂直间距"""
+        spacer = QWidget()
+        spacer.setFixedHeight(height)
+        self.layout.addWidget(spacer)
