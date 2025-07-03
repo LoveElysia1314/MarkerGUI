@@ -310,52 +310,180 @@ class MarkerGUI(QMainWindow):
 
     def get_current_config(self):
         """获取当前UI配置数据"""
-        # 获取高级标签页
-        advanced_tab = self.tabs.widget(3)  # 第4个标签页是高级设置
+        # 获取高级标签页（索引可能变化，改为按名称查找）
+        advanced_tab = None
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) == "高级设置":
+                advanced_tab = self.tabs.widget(i)
+                break
         
+        # 添加属性存在性检查
         return {
             "input_path": self.input_path.text(),
             "output_dir": self.output_dir.text(),
             "output_format": self.output_format.currentText(),
             "page_range": self.page_range.text(),
-            "paginate_output": self.paginate_output.isChecked(),
-            "disable_image_extraction": self.disable_image_extraction.isChecked(),
-            "disable_multiprocessing": self.disable_multiprocessing.isChecked(),
-            "debug_mode": self.debug_mode.isChecked(),
-            "pdftext_workers": self.pdftext_workers.value(),
-            "format_lines": self.format_lines.isChecked(),
-            "force_ocr": self.force_ocr.isChecked(),
-            "strip_existing_ocr": self.strip_existing_ocr.isChecked(),
-            "ocr_task_name": self.ocr_task_name.currentText(),
-            "disable_ocr_math": self.disable_ocr_math.isChecked(),
-            "drop_repeated_text": self.drop_repeated_text.isChecked(),
-            "converter_cls": self.converter_cls.currentText(),
-            "force_layout_block": self.force_layout_block.text(),
-            "use_llm": self.use_llm.isChecked(),
-            "redo_inline_math": self.redo_inline_math.isChecked(),
-            "llm_service": self.llm_service.currentText(),
-            "gemini_api_key": self.gemini_api_key.text(),
-            "gemini_model_name": self.gemini_model_name.text(),
-            "vertex_project_id": self.vertex_project_id.text(),
-            "vertex_location": self.vertex_location.text(),
-            "ollama_base_url": self.ollama_base_url.text(),
-            "ollama_model": self.ollama_model.text(),
-            "claude_api_key": self.claude_api_key.text(),
-            "claude_model_name": self.claude_model_name.text(),
-            "openai_api_key": self.openai_api_key.text(),
-            "openai_model": self.openai_model.text(),
-            "openai_base_url": self.openai_base_url.text(),
-            "max_concurrency": self.max_concurrency.value(),
-            "timeout": self.timeout.value(),
-            "max_retries": self.max_retries.value(),
-            "processors": advanced_tab.processors.text() if hasattr(advanced_tab, 'processors') else "",
-            "num_devices": advanced_tab.num_devices.value() if hasattr(advanced_tab, 'num_devices') else 1,
-            "debug_data_folder": advanced_tab.debug_data_folder.text() if hasattr(advanced_tab, 'debug_data_folder') else "",
-            "debug_layout_images": advanced_tab.debug_layout_images.isChecked() if hasattr(advanced_tab, 'debug_layout_images') else False,
-            "debug_pdf_images": advanced_tab.debug_pdf_images.isChecked() if hasattr(advanced_tab, 'debug_pdf_images') else False,
-            "debug_json": advanced_tab.debug_json.isChecked() if hasattr(advanced_tab, 'debug_json') else False,
-            "num_workers": advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 15,
+            "paginate_output": getattr(self, 'paginate_output', None).isChecked() if hasattr(self, 'paginate_output') else False,
+            "disable_image_extraction": getattr(self, 'disable_image_extraction', None).isChecked() if hasattr(self, 'disable_image_extraction') else False,
+            "disable_multiprocessing": getattr(self, 'disable_multiprocessing', None).isChecked() if hasattr(self, 'disable_multiprocessing') else False,
+            "debug_mode": getattr(self, 'debug_mode', None).isChecked() if hasattr(self, 'debug_mode') else False,
+            "pdftext_workers": getattr(self, 'pdftext_workers', None).value() if hasattr(self, 'pdftext_workers') else 4,
+            "format_lines": getattr(self, 'format_lines', None).isChecked() if hasattr(self, 'format_lines') else False,
+            "force_ocr": getattr(self, 'force_ocr', None).isChecked() if hasattr(self, 'force_ocr') else False,
+            "strip_existing_ocr": getattr(self, 'strip_existing_ocr', None).isChecked() if hasattr(self, 'strip_existing_ocr') else False,
+            "ocr_task_name": getattr(self, 'ocr_task_name', None).currentText() if hasattr(self, 'ocr_task_name') else "",
+            "disable_ocr_math": getattr(self, 'disable_ocr_math', None).isChecked() if hasattr(self, 'disable_ocr_math') else False,
+            "drop_repeated_text": getattr(self, 'drop_repeated_text', None).isChecked() if hasattr(self, 'drop_repeated_text') else False,
+            "converter_cls": getattr(self, 'converter_cls', None).currentText() if hasattr(self, 'converter_cls') else "",
+            "force_layout_block": getattr(self, 'force_layout_block', None).text() if hasattr(self, 'force_layout_block') else "",
+            "use_llm": getattr(self, 'use_llm', None).isChecked() if hasattr(self, 'use_llm') else False,
+            "redo_inline_math": getattr(self, 'redo_inline_math', None).isChecked() if hasattr(self, 'redo_inline_math') else False,
+            "llm_service": getattr(self, 'llm_service', None).currentText() if hasattr(self, 'llm_service') else "",
+            "gemini_api_key": getattr(self, 'gemini_api_key', None).text() if hasattr(self, 'gemini_api_key') else "",
+            "gemini_model_name": getattr(self, 'gemini_model_name', None).text() if hasattr(self, 'gemini_model_name') else "",
+            "vertex_project_id": getattr(self, 'vertex_project_id', None).text() if hasattr(self, 'vertex_project_id') else "",
+            "vertex_location": getattr(self, 'vertex_location', None).text() if hasattr(self, 'vertex_location') else "",
+            "ollama_base_url": getattr(self, 'ollama_base_url', None).text() if hasattr(self, 'ollama_base_url') else "",
+            "ollama_model": getattr(self, 'ollama_model', None).text() if hasattr(self, 'ollama_model') else "",
+            "claude_api_key": getattr(self, 'claude_api_key', None).text() if hasattr(self, 'claude_api_key') else "",
+            "claude_model_name": getattr(self, 'claude_model_name', None).text() if hasattr(self, 'claude_model_name') else "",
+            "openai_api_key": getattr(self, 'openai_api_key', None).text() if hasattr(self, 'openai_api_key') else "",
+            "openai_model": getattr(self, 'openai_model', None).text() if hasattr(self, 'openai_model') else "",
+            "openai_base_url": getattr(self, 'openai_base_url', None).text() if hasattr(self, 'openai_base_url') else "",
+            "max_concurrency": getattr(self, 'max_concurrency', None).value() if hasattr(self, 'max_concurrency') else 1,
+            "timeout": getattr(self, 'timeout', None).value() if hasattr(self, 'timeout') else 30,
+            "max_retries": getattr(self, 'max_retries', None).value() if hasattr(self, 'max_retries') else 3,
+            "processors": advanced_tab.processors.text() if advanced_tab and hasattr(advanced_tab, 'processors') else "",
+            "num_devices": advanced_tab.num_devices.value() if advanced_tab and hasattr(advanced_tab, 'num_devices') else 1,
+            "debug_data_folder": advanced_tab.debug_data_folder.text() if advanced_tab and hasattr(advanced_tab, 'debug_data_folder') else "",
+            "debug_layout_images": advanced_tab.debug_layout_images.isChecked() if advanced_tab and hasattr(advanced_tab, 'debug_layout_images') else False,
+            "debug_pdf_images": advanced_tab.debug_pdf_images.isChecked() if advanced_tab and hasattr(advanced_tab, 'debug_pdf_images') else False,
+            "debug_json": advanced_tab.debug_json.isChecked() if advanced_tab and hasattr(advanced_tab, 'debug_json') else False,
+            "num_workers": advanced_tab.num_workers.value() if advanced_tab and hasattr(advanced_tab, 'num_workers') else 15,
         }
+    
+    def load_config(self):
+        """加载配置文件"""
+        # 获取当前配置名称
+        current_config = self.preset_combo.currentText()
+        config_name, ok = QInputDialog.getText(
+            self, "加载配置", "输入配置名称:",
+            QLineEdit.EchoMode.Normal, current_config
+        )
+        
+        if not ok or not config_name:
+            return
+        
+        # 加载配置
+        config_data = self.config_manager.load_preset(config_name)
+        if not config_data:
+            print(f"[ERROR] 加载失败: 配置 '{config_name}' 不存在")
+            return
+        
+        # 应用配置到UI
+        self.apply_config(config_data)
+        print(f"[INFO] 加载成功: 配置 '{config_name}' 已应用")
+    
+    def apply_config(self, config_data):
+        """应用配置到UI"""
+        # 基本设置
+        self.input_path.setText(config_data.get("input_path", ""))
+        self.output_dir.setText(config_data.get("output_dir", ""))
+        self.output_format.setCurrentText(config_data.get("output_format", "markdown"))
+        self.page_range.setText(config_data.get("page_range", ""))
+        
+        # 基本选项
+        if hasattr(self, 'paginate_output'):
+            self.paginate_output.setChecked(config_data.get("paginate_output", False))
+        if hasattr(self, 'disable_image_extraction'):
+            self.disable_image_extraction.setChecked(config_data.get("disable_image_extraction", False))
+        if hasattr(self, 'disable_multiprocessing'):
+            self.disable_multiprocessing.setChecked(config_data.get("disable_multiprocessing", False))
+        if hasattr(self, 'debug_mode'):
+            self.debug_mode.setChecked(config_data.get("debug_mode", False))
+        if hasattr(self, 'pdftext_workers'):
+            self.pdftext_workers.setValue(config_data.get("pdftext_workers", 4))
+        
+        # OCR选项
+        if hasattr(self, 'format_lines'):
+            self.format_lines.setChecked(config_data.get("format_lines", False))
+        if hasattr(self, 'force_ocr'):
+            self.force_ocr.setChecked(config_data.get("force_ocr", False))
+        if hasattr(self, 'strip_existing_ocr'):
+            self.strip_existing_ocr.setChecked(config_data.get("strip_existing_ocr", False))
+        if hasattr(self, 'ocr_task_name'):
+            self.set_combo_text(self.ocr_task_name, config_data.get("ocr_task_name", ""))
+        if hasattr(self, 'disable_ocr_math'):
+            self.disable_ocr_math.setChecked(config_data.get("disable_ocr_math", False))
+        if hasattr(self, 'drop_repeated_text'):
+            self.drop_repeated_text.setChecked(config_data.get("drop_repeated_text", False))
+        
+        # 转换器设置
+        if hasattr(self, 'converter_cls'):
+            self.set_combo_text(self.converter_cls, config_data.get("converter_cls", ""))
+        if hasattr(self, 'force_layout_block'):
+            self.force_layout_block.setText(config_data.get("force_layout_block", ""))
+        
+        # LLM设置
+        if hasattr(self, 'use_llm'):
+            self.use_llm.setChecked(config_data.get("use_llm", False))
+        if hasattr(self, 'redo_inline_math'):
+            self.redo_inline_math.setChecked(config_data.get("redo_inline_math", False))
+        if hasattr(self, 'llm_service'):
+            self.set_combo_text(self.llm_service, config_data.get("llm_service", ""))
+        if hasattr(self, 'gemini_api_key'):
+            self.gemini_api_key.setText(config_data.get("gemini_api_key", ""))
+        if hasattr(self, 'gemini_model_name'):
+            self.gemini_model_name.setText(config_data.get("gemini_model_name", ""))
+        if hasattr(self, 'vertex_project_id'):
+            self.vertex_project_id.setText(config_data.get("vertex_project_id", ""))
+        if hasattr(self, 'vertex_location'):
+            self.vertex_location.setText(config_data.get("vertex_location", ""))
+        if hasattr(self, 'ollama_base_url'):
+            self.ollama_base_url.setText(config_data.get("ollama_base_url", ""))
+        if hasattr(self, 'ollama_model'):
+            self.ollama_model.setText(config_data.get("ollama_model", ""))
+        if hasattr(self, 'claude_api_key'):
+            self.claude_api_key.setText(config_data.get("claude_api_key", ""))
+        if hasattr(self, 'claude_model_name'):
+            self.claude_model_name.setText(config_data.get("claude_model_name", ""))
+        if hasattr(self, 'openai_api_key'):
+            self.openai_api_key.setText(config_data.get("openai_api_key", ""))
+        if hasattr(self, 'openai_model'):
+            self.openai_model.setText(config_data.get("openai_model", ""))
+        if hasattr(self, 'openai_base_url'):
+            self.openai_base_url.setText(config_data.get("openai_base_url", ""))
+        if hasattr(self, 'max_concurrency'):
+            self.max_concurrency.setValue(config_data.get("max_concurrency", 1))
+        if hasattr(self, 'timeout'):
+            self.timeout.setValue(config_data.get("timeout", 30))
+        if hasattr(self, 'max_retries'):
+            self.max_retries.setValue(config_data.get("max_retries", 3))
+        
+        # 高级设置
+        advanced_tab = None
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) == "高级设置":
+                advanced_tab = self.tabs.widget(i)
+                break
+        
+        if advanced_tab:
+            if hasattr(advanced_tab, 'processors'):
+                advanced_tab.processors.setText(config_data.get("processors", ""))
+            if hasattr(advanced_tab, 'num_devices'):
+                advanced_tab.num_devices.setValue(config_data.get("num_devices", 1))
+            if hasattr(advanced_tab, 'debug_data_folder'):
+                advanced_tab.debug_data_folder.setText(config_data.get("debug_data_folder", ""))
+            if hasattr(advanced_tab, 'debug_layout_images'):
+                advanced_tab.debug_layout_images.setChecked(config_data.get("debug_layout_images", False))
+            if hasattr(advanced_tab, 'debug_pdf_images'):
+                advanced_tab.debug_pdf_images.setChecked(config_data.get("debug_pdf_images", False))
+            if hasattr(advanced_tab, 'debug_json'):
+                advanced_tab.debug_json.setChecked(config_data.get("debug_json", False))
+            if hasattr(advanced_tab, 'num_workers'):
+                advanced_tab.num_workers.setValue(config_data.get("num_workers", 15))
+        
+        print("[INFO] 配置已成功应用到UI")
     
     def save_config(self):
         # 获取当前配置名称
@@ -384,6 +512,14 @@ class MarkerGUI(QMainWindow):
         else:
             print("[ERROR] 保存失败: 无法保存配置")
 
+    def refresh_config_list(self):
+        """刷新配置列表"""
+        if hasattr(self, 'preset_combo'):
+            self.preset_combo.clear()
+            presets = self.config_manager.get_available_presets()
+            for preset in presets:
+                self.preset_combo.addItem(preset)
+    
     def set_combo_text(self, combo, text):
         index = combo.findText(text)
         if index >= 0:
@@ -391,3 +527,10 @@ class MarkerGUI(QMainWindow):
         else:
             combo.addItem(text)
             combo.setCurrentIndex(combo.count() - 1)
+
+    def reset_config(self):
+        """重置配置为默认值"""
+        self.config_manager.reset_to_default()
+        self.apply_config(self.config_manager.default_config)
+        self.refresh_config_list()  # 刷新预设列表
+        print("[INFO] 配置已重置为默认值")

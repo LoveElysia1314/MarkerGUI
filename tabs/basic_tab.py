@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
-    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea,QSizePolicy
+    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea, QSizePolicy
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -81,6 +81,54 @@ def create_basic_tab(parent):
     ocr_basic_group.setLayout(ocr_basic_layout)
     layout.addWidget(ocr_basic_group)
     
+    # 配置管理
+    config_group = QGroupBox("配置管理")
+    config_layout = QFormLayout()
+    
+    parent.preset_combo = QComboBox()
+    config_layout.addRow("当前预设:", parent.preset_combo)
+    
+    # 刷新配置列表函数
+    def refresh_config_list():
+        parent.preset_combo.clear()
+        presets = parent.config_manager.get_available_presets()
+        for preset in presets:
+            parent.preset_combo.addItem(preset)
+    
+    # 预设切换处理函数
+    def on_preset_changed(preset_name):
+        if not preset_name:
+            return
+        preset_config = parent.config_manager.load_preset(preset_name)
+        # 确保配置是字典类型
+        if not preset_config or not isinstance(preset_config, dict):
+            print(f"[ERROR] 加载预设失败: '{preset_name}' 无效的配置格式")
+            return
+        current_config = parent.get_current_config()
+        for key in preset_config:
+            if key in current_config:
+                current_config[key] = preset_config[key]
+        parent.apply_config(current_config)
+    
+    # 连接信号
+    parent.preset_combo.currentTextChanged.connect(on_preset_changed)
+    refresh_config_list()  # 初始刷新
+    
+    config_btn_layout = QHBoxLayout()
+    parent.save_config_btn = QPushButton("保存配置")
+    parent.save_config_btn.clicked.connect(parent.save_config)
+    parent.load_config_btn = QPushButton("加载配置")
+    parent.load_config_btn.clicked.connect(parent.load_config)
+    parent.reset_config_btn = QPushButton("重置配置")
+    parent.reset_config_btn.clicked.connect(parent.reset_config)
+    
+    config_btn_layout.addWidget(parent.save_config_btn)
+    config_btn_layout.addWidget(parent.load_config_btn)
+    config_btn_layout.addWidget(parent.reset_config_btn)
+    config_layout.addRow(config_btn_layout)
+    
+    config_group.setLayout(config_layout)
+    layout.addWidget(config_group)
     
     layout.addStretch()
     return scroll

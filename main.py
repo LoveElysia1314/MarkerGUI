@@ -6,7 +6,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     
     # 设置应用程序样式
-    app.setStyle("Fusion")
+    app.setStyle("Fusion") 
     
     # 创建主窗口
     window = MarkerGUI()

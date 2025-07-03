@@ -77,10 +77,10 @@ class ConfigManager:
         """加载指定预设"""
         if preset_name not in self.presets:
             QMessageBox.warning(None, "配置错误", f"预设 '{preset_name}' 不存在")
-            return False
+            return {}
         
         self.current_config = self.presets[preset_name].get("settings", {})
-        return True
+        return self.current_config
     
     def save_preset(self, preset_name, config_data, description="", overwrite=False):
         """保存当前配置为新预设"""
@@ -103,6 +103,8 @@ class ConfigManager:
         try:
             with open(self.DEFAULT_PRESET_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.presets, f, indent=2, ensure_ascii=False)
+            # 更新当前配置为新保存的配置
+            self.current_config = config_data
             return True
         except Exception as e:
             QMessageBox.critical(None, "保存失败", f"保存预设时出错: {str(e)}")
@@ -111,12 +113,14 @@ class ConfigManager:
     def reset_to_default(self):
         """重置为默认预设"""
         if "default" in self.presets:
-            return self.load_preset("default")
-        return False
+            config = self.load_preset("default")
+            self.current_config = config  # 确保更新当前配置
+            return config
+        return {}
     
     def get_current_config(self):
         """获取当前配置"""
-        return self.current_config
+        return self.current_config.copy()  # 返回副本防止意外修改
     
     def update_config(self, key, value):
         """更新当前配置项"""
