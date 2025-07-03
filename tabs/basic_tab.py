@@ -81,31 +81,6 @@ def create_basic_tab(parent):
     ocr_basic_group.setLayout(ocr_basic_layout)
     layout.addWidget(ocr_basic_group)
     
-    # 转换器设置
-    converter_group = QGroupBox("转换器设置")
-    converter_layout = QVBoxLayout()
-    
-    converter_type_layout = QHBoxLayout()
-    converter_type_layout.addWidget(QLabel("转换器类型:"))
-    parent.converter_cls = QComboBox()
-    parent.converter_cls.addItems([
-        "marker.converters.pdf.PdfConverter (默认)",
-        "marker.converters.table.TableConverter",
-        "marker.converters.ocr.OCRConverter",
-        "marker.converters.extraction.ExtractionConverter"
-    ])
-    converter_type_layout.addWidget(parent.converter_cls)
-    converter_type_layout.addStretch()
-    converter_layout.addLayout(converter_type_layout)
-    
-    force_layout_layout = QHBoxLayout()
-    force_layout_layout.addWidget(QLabel("强制布局块 (高级):"))
-    parent.force_layout_block = QLineEdit()
-    force_layout_layout.addWidget(parent.force_layout_block)
-    converter_layout.addLayout(force_layout_layout)
-    
-    converter_group.setLayout(converter_layout)
-    layout.addWidget(converter_group)
     
     layout.addStretch()
     return scroll

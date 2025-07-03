@@ -3,9 +3,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QGroupBox, QLabel, QLineEdit, QPushButton,
     QComboBox, QCheckBox, QSpinBox, QFormLayout, QVBoxLayout
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 class AdvancedTab(BaseTab):
+    preset_changed = Signal(str)  # 预设切换信号
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.config_manager = parent.config_manager
@@ -69,12 +71,11 @@ class AdvancedTab(BaseTab):
         config_layout = QFormLayout()
         
         self.preset_combo = QComboBox()
+        self.preset_combo.currentTextChanged.connect(self.on_preset_changed)
         config_layout.addRow("当前预设:", self.preset_combo)
         self.refresh_config_list()
         
         config_btn_layout = QHBoxLayout()
-        self.apply_preset_btn = QPushButton("应用预设")
-        self.apply_preset_btn.clicked.connect(self.apply_preset)
         self.save_config_btn = QPushButton("保存配置")
         self.save_config_btn.clicked.connect(self.save_config)
         self.load_config_btn = QPushButton("加载配置")
@@ -82,7 +83,6 @@ class AdvancedTab(BaseTab):
         self.reset_config_btn = QPushButton("重置配置")
         self.reset_config_btn.clicked.connect(self.reset_config)
         
-        config_btn_layout.addWidget(self.apply_preset_btn)
         config_btn_layout.addWidget(self.save_config_btn)
         config_btn_layout.addWidget(self.load_config_btn)
         config_btn_layout.addWidget(self.reset_config_btn)
@@ -100,12 +100,26 @@ class AdvancedTab(BaseTab):
         for preset in presets:
             self.preset_combo.addItem(preset)
     
-    def apply_preset(self):
-        """应用选中的预设"""
-        preset_name = self.preset_combo.currentText()
-        if preset_name:
-            self.config_manager.load_preset(preset_name)
-            self.main_window.update_ui_from_config()
+    def on_preset_changed(self, preset_name):
+        """预设切换时自动应用部分更新"""
+        if not preset_name:
+            return
+            
+        # 加载预设配置
+        preset_config = self.config_manager.load_preset(preset_name)
+        if not preset_config:
+            return
+            
+        # 获取当前配置
+        current_config = self.main_window.get_current_config()
+        
+        # 部分更新：只覆盖预设中定义的设置
+        for key in preset_config:
+            if key in current_config:
+                current_config[key] = preset_config[key]
+                
+        # 应用更新后的配置
+        self.main_window.apply_config(current_config)
     
     def save_config(self):
         """保存当前配置"""

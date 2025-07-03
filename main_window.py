@@ -1,12 +1,13 @@
 import os
 import sys
+import shlex
 from pathlib import Path
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QGroupBox, QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox,
     QTextEdit, QFileDialog, QMessageBox, QSpinBox, QFormLayout, QInputDialog, QApplication, QSplitter
 )
-from PySide6.QtCore import Qt, Signal, QProcess, QThread, QObject
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont
 from config_manager import ConfigManager
 from tabs.basic_tab import create_basic_tab
@@ -15,58 +16,6 @@ from tabs.llm_tab import create_llm_tab
 from tabs.advanced_tab import AdvancedTab
 from command_generator import generate_command
 from utils import EmittingStream
-
-class CommandWorker(QObject):
-    """异步执行命令的工作线程"""
-    output = Signal(str)
-    finished = Signal(int)
-    error = Signal(str)
-    
-    def __init__(self, command):
-        super().__init__()
-        self.command = command
-        self.process = None
-    
-    def run(self):
-        """执行命令并捕获输出"""
-        try:
-            self.process = QProcess()
-            self.process.readyReadStandardOutput.connect(self.handle_output)
-            self.process.readyReadStandardError.connect(self.handle_error)
-            self.process.finished.connect(self.handle_finished)
-            
-            # 在Windows上使用cmd.exe执行命令
-            self.process.start("cmd.exe", ["/c", self.command])
-            if not self.process.waitForStarted():
-                self.error.emit("无法启动命令进程")
-                return
-                
-            # 等待命令完成（使用事件循环）
-            self.process.waitForFinished(-1)
-                
-        except Exception as e:
-            self.error.emit(str(e))
-    
-    def handle_output(self):
-        """处理标准输出"""
-        output = self.process.readAllStandardOutput().data().decode().strip()
-        if output:
-            self.output.emit(output)
-    
-    def handle_error(self):
-        """处理错误输出"""
-        error = self.process.readAllStandardError().data().decode().strip()
-        if error:
-            self.error.emit(error)
-    
-    def handle_finished(self, exit_code):
-        """命令执行完成"""
-        self.finished.emit(exit_code)
-        
-    def terminate(self):
-        """终止命令执行"""
-        if self.process and self.process.state() == QProcess.Running:
-            self.process.terminate()
 
 class MarkerGUI(QMainWindow):
     def __init__(self):
@@ -78,8 +27,8 @@ class MarkerGUI(QMainWindow):
         
         # 初始化配置管理器
         self.config_manager = ConfigManager()
-        self.worker = None  # 异步工作线程
-        self.thread = None  # QThread实例
+        # 不再使用QProcess，改为直接执行命令
+        self.process = None  # 保留变量但设为None以防引用错误
         
         # 创建主分割器（水平3:2）
         main_splitter = QSplitter(Qt.Horizontal)
@@ -100,32 +49,31 @@ class MarkerGUI(QMainWindow):
         main_splitter.addWidget(right_widget)
         main_splitter.setSizes([600, 400])  # 初始比例3:2
         
-        # 左面板垂直分割（上功能区40%，下功能区60%）
-        left_splitter = QSplitter(Qt.Vertical)
-        left_layout.addWidget(left_splitter)
+        # 左面板分页
+        self.left_tabs = QTabWidget()
+        left_layout.addWidget(self.left_tabs)
         
-        # 上功能区：命令行输出
-        console_group = QGroupBox("命令行输出")
-        console_layout = QVBoxLayout()
-        self.console_output = QTextEdit()
-        self.console_output.setReadOnly(True)
-        self.console_output.setFont(QFont("Courier New", 9))
-        console_layout.addWidget(self.console_output)
+        # 第一页：控制台
+        console_page = QWidget()
+        console_page_layout = QVBoxLayout()
+        console_page.setLayout(console_page_layout)
+        self.left_tabs.addTab(console_page, "控制台")
         
-        # 控制按钮
-        control_btn_layout = QHBoxLayout()
-        self.clear_btn = QPushButton("清除命令行")
-        self.clear_btn.clicked.connect(self.clear_console)
-        self.stop_btn = QPushButton("终止运行")
-        self.stop_btn.clicked.connect(self.stop_command)
-        control_btn_layout.addWidget(self.clear_btn)
-        control_btn_layout.addWidget(self.stop_btn)
-        console_layout.addLayout(control_btn_layout)
+        # 控制台页垂直分割器
+        console_splitter = QSplitter(Qt.Vertical)
+        console_page_layout.addWidget(console_splitter)
         
-        console_group.setLayout(console_layout)
-        left_splitter.addWidget(console_group)
+        # 运行日志组（新终端控件）
+        runtime_log_group = QGroupBox("运行日志")
+        runtime_log_layout = QVBoxLayout()
+        self.runtime_log = QTextEdit()
+        self.runtime_log.setReadOnly(True)
+        self.runtime_log.setFont(QFont("Courier New", 9))
+        runtime_log_layout.addWidget(self.runtime_log)
+        runtime_log_group.setLayout(runtime_log_layout)
+        console_splitter.addWidget(runtime_log_group)
         
-        # 下功能区：生成的命令
+        # 生成的命令组
         command_group = QGroupBox("生成的命令")
         command_layout = QVBoxLayout()
         self.command_output = QTextEdit()
@@ -134,7 +82,7 @@ class MarkerGUI(QMainWindow):
         self.command_output.setLineWrapMode(QTextEdit.WidgetWidth)
         command_layout.addWidget(self.command_output)
         
-        # 命令组按钮（在文本控件下方）
+        # 命令组按钮
         command_btn_layout = QHBoxLayout()
         self.generate_btn = QPushButton("生成命令")
         self.generate_btn.clicked.connect(self.generate_command)
@@ -148,9 +96,12 @@ class MarkerGUI(QMainWindow):
         
         command_layout.addLayout(command_btn_layout)
         command_group.setLayout(command_layout)
-        left_splitter.addWidget(command_group)
+        console_splitter.addWidget(command_group)
         
-        # 输入和输出设置 (从基本设置页移出)
+        # 设置运行日志组和命令组比例 2:1
+        console_splitter.setSizes([400, 200])
+        
+        # 输入和输出设置组
         input_output_group = QGroupBox("输入和输出设置")
         input_output_layout = QFormLayout()
         
@@ -182,20 +133,77 @@ class MarkerGUI(QMainWindow):
         input_output_layout.addRow("页面范围 (如 1-5,8):", self.page_range)
         
         input_output_group.setLayout(input_output_layout)
-        left_splitter.addWidget(input_output_group)
+        console_page_layout.addWidget(input_output_group)
         
-        # 调整分割器大小比例 (3:2:2)
-        left_splitter.setSizes([600, 400, 400])  
+        # 转换器设置组（从基本设置页迁移）
+        converter_group = QGroupBox("转换器设置")
+        converter_layout = QVBoxLayout()
+        
+        converter_type_layout = QHBoxLayout()
+        converter_type_layout.addWidget(QLabel("转换器类型:"))
+        self.converter_cls = QComboBox()
+        self.converter_cls.addItems([
+            "marker.converters.pdf.PdfConverter (默认)",
+            "marker.converters.table.TableConverter",
+            "marker.converters.ocr.OCRConverter",
+            "marker.converters.extraction.ExtractionConverter"
+        ])
+        converter_type_layout.addWidget(self.converter_cls)
+        converter_type_layout.addStretch()
+        converter_layout.addLayout(converter_type_layout)
+        
+        force_layout_layout = QHBoxLayout()
+        force_layout_layout.addWidget(QLabel("强制布局块 (高级):"))
+        self.force_layout_block = QLineEdit()
+        force_layout_layout.addWidget(self.force_layout_block)
+        converter_layout.addLayout(force_layout_layout)
+        
+        converter_group.setLayout(converter_layout)
+        console_page_layout.addWidget(converter_group)
+        
         
         # 右面板：标签页
         self.tabs = QTabWidget()
         right_layout.addWidget(self.tabs)
         
-        # 添加标签页 (移除基本设置页中的输入输出控件)
+        # 添加标签页（基本设置页已移除转换器设置）
         self.tabs.addTab(create_basic_tab(self), "基本设置")
         self.tabs.addTab(create_ocr_tab(self), "OCR设置")
         self.tabs.addTab(create_llm_tab(self), "LLM设置")
         self.tabs.addTab(AdvancedTab(self), "高级设置")
+        
+        # 初始化输出重定向到运行日志
+        self.init_output_redirection()
+        
+        # 初始化配置
+        self.config_manager.reset_to_default()
+        self.toggle_llm_options(False)
+        
+        # 添加自适应宽度逻辑
+        self.adjustSize()
+        
+    def init_output_redirection(self):
+        """初始化输出重定向"""
+        # 程序日志重定向到运行日志
+        self.program_stream = EmittingStream()
+        sys.stdout = self.program_stream
+        self.program_stream.textWritten.connect(self.handle_runtime_output)
+        
+    def handle_runtime_output(self, text):
+        """处理运行日志输出"""
+        self.runtime_log.append(text)
+        
+    def handle_console_output(self, text):
+        """处理命令行输出（历史日志）"""
+        self.console_output.append(text)
+        
+    def clear_console(self):
+        """清除历史日志"""
+        self.console_output.clear()
+        
+    def clear_runtime_log(self):
+        """清除运行日志"""
+        self.runtime_log.clear()
         
         # 初始化输出重定向
         self.init_output_redirection()
@@ -207,15 +215,21 @@ class MarkerGUI(QMainWindow):
         # 添加自适应宽度逻辑
         self.adjustSize()
         
-    def init_output_redirection(self):
-        """初始化输出重定向到命令行控件"""
-        self.output_stream = EmittingStream()
-        sys.stdout = self.output_stream
-        self.output_stream.textWritten.connect(self.handle_console_output)
+    def handle_runtime_output(self, text):
+        """处理运行日志输出"""
+        self.runtime_log.append(text)
         
     def handle_console_output(self, text):
-        """处理控制台输出"""
-        self.console_output.append(text)  # 直接附加文本，无颜色格式化
+        """处理命令行输出（历史日志）"""
+        self.console_output.append(text)
+        
+    def clear_runtime_log(self):
+        """清除运行日志"""
+        self.runtime_log.clear()
+        
+    def clear_console(self):
+        """清除历史日志"""
+        self.console_output.clear()
         
     def clear_console(self):
         """清除命令行输出"""
@@ -279,50 +293,20 @@ class MarkerGUI(QMainWindow):
             print("[WORRY] 复制错误: 没有可复制的命令")
             
     def run_command(self):
-        """异步运行生成的命令"""
+        """在新cmd窗口中执行命令"""
         command = self.command_output.toPlainText().strip()
         if not command:
             print("[WORRY] 运行错误: 没有可运行的命令")
             return
         
-        # 创建并启动工作线程
-        self.worker = CommandWorker(command)
-        self.thread = QThread()
-        self.worker.moveToThread(self.thread)
-        
-        # 连接信号
-        self.worker.output.connect(self.handle_command_output)
-        self.worker.error.connect(self.handle_command_error)
-        self.worker.finished.connect(self.on_command_finished)
-        self.thread.started.connect(self.worker.run)
-        
-        print(f"[INFO] 开始执行命令: {command}")
-        self.thread.start()
+        # 使用os.system在新窗口执行命令
+        full_command = f'start cmd /k "{command}"'
+        print(f"[INFO] 在新窗口执行命令: {command}")
+        os.system(full_command)
     
-    def handle_command_output(self, text):
-        """处理命令输出"""
-        print(text)
     
-    def handle_command_error(self, error):
-        """处理命令错误"""
-        print(f"[ERROR] {error}")
     
-    def on_command_finished(self, exit_code):
-        """命令执行完成"""
-        self.thread.quit()
-        self.thread.wait()
-        if exit_code == 0:
-            print("[INFO] 命令执行成功")
-        else:
-            print(f"[WORRY] 命令异常退出，代码: {exit_code}")
     
-    def stop_command(self):
-        """终止正在运行的命令"""
-        if hasattr(self, 'worker') and self.worker:
-            self.worker.terminate()
-            print("[INFO] 命令运行已终止")
-        else:
-            print("[WORRY] 没有正在运行的命令")
 
     def get_current_config(self):
         """获取当前UI配置数据"""
