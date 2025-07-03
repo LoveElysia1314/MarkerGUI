@@ -1,6 +1,45 @@
 import os
 from PySide6.QtWidgets import QMessageBox
 
+# 预设配置数据
+PRESET_CONFIGS = {
+    "default": {
+        "output_format": "markdown",
+        "paginate_output": False,
+        "disable_image_extraction": False,
+        "disable_multiprocessing": False,
+        "debug_mode": False,
+        "pdftext_workers": 4,
+        "format_lines": False,
+        "force_ocr": False,
+        "strip_existing_ocr": False,
+        "ocr_task_name": "ocr_with_boxes",
+        "disable_ocr_math": False,
+        "drop_repeated_text": False,
+        "converter_cls": "marker.converters.pdf.PdfConverter (默认)",
+        "use_llm": False
+    },
+    "high_quality": {
+        "output_format": "markdown",
+        "use_llm": True,
+        "llm_service": "Google Gemini",
+        "gemini_model_name": "gemini-2.0-flash"
+    },
+    "table_extraction": {
+        "converter_cls": "marker.converters.table.TableConverter",
+        "disable_image_extraction": True
+    },
+    "pure_ocr": {
+        "converter_cls": "marker.converters.ocr.OCRConverter",
+        "force_ocr": True,
+        "use_llm": False
+    }
+}
+
+def get_preset_config(preset_name):
+    """获取预设配置"""
+    return PRESET_CONFIGS.get(preset_name, PRESET_CONFIGS["default"])
+
 def generate_command(window):
     """
     根据主窗口的UI设置生成Marker命令
@@ -12,6 +51,10 @@ def generate_command(window):
         # 确定是单文件还是批量处理
         if input_path and os.path.isdir(input_path):
             command += "marker "
+            # 当输入是文件夹且输出路径为空时打印警告
+            output_dir = window.output_dir.text().strip()
+            if not output_dir:
+                print("[WARNING]当前未设置输出路径")
         elif input_path:
             command += "marker_single "
         else:

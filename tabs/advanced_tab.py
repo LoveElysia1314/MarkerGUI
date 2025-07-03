@@ -38,7 +38,7 @@ class AdvancedTab(BaseTab):
         num_workers_layout.addWidget(QLabel("每GPU工作进程数:"))
         self.num_workers = QSpinBox()
         self.num_workers.setRange(1, 64)
-        self.num_workers.setValue(15)
+        self.num_workers.setValue(32)
         num_workers_layout.addWidget(self.num_workers)
         gpu_layout.addRow(num_workers_layout)
         

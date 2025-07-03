@@ -73,6 +73,30 @@ class ConfigManager:
         """获取可用预设列表"""
         return list(self.presets.keys())
     
+    def preset_exists(self, preset_name):
+        """检查预设是否存在"""
+        return preset_name in self.presets
+        
+    def delete_preset(self, preset_name):
+        """删除指定的预设"""
+        if preset_name not in self.presets:
+            return False
+            
+        if preset_name == "default":
+            return False
+            
+        # 从预设字典中删除
+        del self.presets[preset_name]
+        
+        # 保存更新后的预设到文件
+        try:
+            with open(self.DEFAULT_PRESET_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.presets, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"[ERROR] 删除预设失败: {str(e)}")
+            return False
+    
     def load_preset(self, preset_name):
         """加载指定预设"""
         if preset_name not in self.presets:

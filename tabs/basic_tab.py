@@ -119,9 +119,15 @@ def create_basic_tab(parent):
     parent.save_config_btn.clicked.connect(parent.save_config)
     parent.reset_config_btn = QPushButton("重置配置")
     parent.reset_config_btn.clicked.connect(parent.reset_config)
+    parent.delete_config_btn = QPushButton("删除预设")
+    parent.delete_config_btn.clicked.connect(parent.delete_preset)
+    parent.reset_preset_btn = QPushButton("重置预设")
+    parent.reset_preset_btn.clicked.connect(parent.reset_preset)
     
     config_btn_layout.addWidget(parent.save_config_btn)
     config_btn_layout.addWidget(parent.reset_config_btn)
+    config_btn_layout.addWidget(parent.delete_config_btn)
+    config_btn_layout.addWidget(parent.reset_preset_btn)
     config_layout.addRow(config_btn_layout)
     
     config_group.setLayout(config_layout)

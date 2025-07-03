@@ -30,16 +30,16 @@ class MarkerGUI(QMainWindow):
         # 不再使用QProcess，改为直接执行命令
         self.process = None  # 保留变量但设为None以防引用错误
         
-        # 创建主分割器（水平3:2）
+        # 创建主分割器
         main_splitter = QSplitter(Qt.Horizontal)
         self.setCentralWidget(main_splitter)
         
-        # 左面板（60%）
+        # 左面板
         left_widget = QWidget()
         left_layout = QVBoxLayout()
         left_widget.setLayout(left_layout)
         
-        # 右面板（40%）
+        # 右面板
         right_widget = QWidget()
         right_layout = QVBoxLayout()
         right_widget.setLayout(right_layout)
@@ -272,6 +272,9 @@ class MarkerGUI(QMainWindow):
         
         if path:
             self.input_path.setText(path)
+            # 当选择文件且输出目录为空时，自动设置为文件所在目录
+            if input_type == "file" and not self.output_dir.text().strip():
+                self.output_dir.setText(os.path.dirname(path))
 
     def browse_output(self):
         path = QFileDialog.getExistingDirectory(self, "选择输出目录")
@@ -384,7 +387,7 @@ class MarkerGUI(QMainWindow):
             config["debug_layout_images"] = advanced_tab.debug_layout_images.isChecked() if hasattr(advanced_tab, 'debug_layout_images') else False
             config["debug_pdf_images"] = advanced_tab.debug_pdf_images.isChecked() if hasattr(advanced_tab, 'debug_pdf_images') else False
             config["debug_json"] = advanced_tab.debug_json.isChecked() if hasattr(advanced_tab, 'debug_json') else False
-            config["num_workers"] = advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 15
+            config["num_workers"] = advanced_tab.num_workers.value() if hasattr(advanced_tab, 'num_workers') else 32
         
         return config
     
@@ -456,6 +459,33 @@ class MarkerGUI(QMainWindow):
             self.preset_combo.setCurrentText(config_name)
         else:
             print("[ERROR] 保存失败: 无法保存配置")
+            
+    def delete_preset(self):
+        """删除当前选中的预设"""
+        preset_name = self.preset_combo.currentText()
+        if not preset_name:
+            print("[WORRY] 删除失败: 没有选中的预设")
+            return
+            
+        if preset_name == "default":
+            print("[ERROR] 删除失败: 不能删除默认预设")
+            return
+            
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"确定要永久删除预设 '{preset_name}' 吗?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.No:
+            return
+            
+        # 从配置管理器中删除预设
+        if self.config_manager.delete_preset(preset_name):
+            print(f"[INFO] 删除成功: 预设 '{preset_name}' 已删除")
+            self.refresh_config_list()
+        else:
+            print(f"[ERROR] 删除失败: 无法删除预设 '{preset_name}'")
 
     def refresh_config_list(self):
         """刷新配置列表"""
@@ -474,8 +504,37 @@ class MarkerGUI(QMainWindow):
             combo.setCurrentIndex(combo.count() - 1)
 
     def reset_config(self):
-        """重置配置为默认值"""
-        self.config_manager.reset_to_default()
-        self.apply_config(self.config_manager.default_config)
-        self.refresh_config_list()  # 刷新预设列表
-        print("[INFO] 配置已重置为默认值")
+        """重置配置逻辑"""
+        current_preset = self.preset_combo.currentText()
+        
+        # 如果当前预设存在，则复位该预设
+        if current_preset and self.config_manager.preset_exists(current_preset):
+            preset_config = self.config_manager.load_preset(current_preset)
+            self.apply_config(preset_config)
+            print(f"[INFO] 配置已复位到预设 '{current_preset}'")
+        else:
+            # 否则清空当前配置并应用默认配置
+            self.config_manager.reset_to_default()
+            self.apply_config(self.config_manager.default_config)
+            self.refresh_config_list()  # 刷新预设列表
+            print("[INFO] 配置已重置为默认值")
+            
+    def reset_preset(self):
+        """将当前预设复位到command_generator.py中定义的状态"""
+        from command_generator import get_preset_config
+        
+        preset_name = self.preset_combo.currentText()
+        if not preset_name:
+            print("[WORRY] 重置预设失败: 没有选中的预设")
+            return
+            
+        # 获取预设配置
+        preset_config = get_preset_config(preset_name)
+        if preset_config:
+            self.apply_config(preset_config)
+            print(f"[INFO] 预设 '{preset_name}' 已复位到command_generator定义的状态")
+        else:
+            # 获取默认配置
+            default_config = get_preset_config("default")
+            self.apply_config(default_config)
+            print("[INFO] 预设已复位到command_generator的默认状态")
