@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, 
-    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea, QSizePolicy
+    QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox, QFormLayout, QScrollArea, QSizePolicy, QGridLayout
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -114,7 +114,8 @@ def create_basic_tab(parent):
     parent.preset_combo.currentTextChanged.connect(on_preset_changed)
     refresh_config_list()  # 初始刷新
     
-    config_btn_layout = QHBoxLayout()
+    # 使用网格布局实现换行效果
+    config_btn_layout = QGridLayout()
     parent.save_config_btn = QPushButton("保存配置")
     parent.save_config_btn.clicked.connect(parent.save_config)
     parent.reset_config_btn = QPushButton("重置配置")
@@ -124,10 +125,13 @@ def create_basic_tab(parent):
     parent.reset_preset_btn = QPushButton("重置预设")
     parent.reset_preset_btn.clicked.connect(parent.reset_preset)
     
-    config_btn_layout.addWidget(parent.save_config_btn)
-    config_btn_layout.addWidget(parent.reset_config_btn)
-    config_btn_layout.addWidget(parent.delete_config_btn)
-    config_btn_layout.addWidget(parent.reset_preset_btn)
+    # 将按钮添加到网格布局中，每行最多2个按钮
+    config_btn_layout.addWidget(parent.save_config_btn, 0, 0)
+    config_btn_layout.addWidget(parent.reset_config_btn, 0, 1)
+    config_btn_layout.addWidget(parent.delete_config_btn, 1, 0)
+    config_btn_layout.addWidget(parent.reset_preset_btn, 1, 1)
+    
+    # 添加布局到表单
     config_layout.addRow(config_btn_layout)
     
     config_group.setLayout(config_layout)

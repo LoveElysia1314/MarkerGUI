@@ -22,8 +22,8 @@ class MarkerGUI(QMainWindow):
         super().__init__()
         self.setWindowTitle("Marker Document Converter")
         # 设置初始最小尺寸
-        self.setMinimumWidth(800)
-        self.setMinimumHeight(400)
+        self.setMinimumWidth(720)
+        self.setMinimumHeight(480)
         
         # 初始化配置管理器
         self.config_manager = ConfigManager()
@@ -98,8 +98,8 @@ class MarkerGUI(QMainWindow):
         command_group.setLayout(command_layout)
         console_splitter.addWidget(command_group)
         
-        # 设置运行日志组和命令组比例 2:1
-        console_splitter.setSizes([400, 200])
+        # 设置运行日志组和命令组比例 1:1
+        console_splitter.setSizes([300, 300])
         
         # 输入和输出设置组
         input_output_group = QGroupBox("输入和输出设置")
