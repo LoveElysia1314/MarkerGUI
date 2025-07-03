@@ -117,13 +117,10 @@ def create_basic_tab(parent):
     config_btn_layout = QHBoxLayout()
     parent.save_config_btn = QPushButton("保存配置")
     parent.save_config_btn.clicked.connect(parent.save_config)
-    parent.load_config_btn = QPushButton("加载配置")
-    parent.load_config_btn.clicked.connect(parent.load_config)
     parent.reset_config_btn = QPushButton("重置配置")
     parent.reset_config_btn.clicked.connect(parent.reset_config)
     
     config_btn_layout.addWidget(parent.save_config_btn)
-    config_btn_layout.addWidget(parent.load_config_btn)
     config_btn_layout.addWidget(parent.reset_config_btn)
     config_layout.addRow(config_btn_layout)
     

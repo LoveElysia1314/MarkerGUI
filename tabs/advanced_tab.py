@@ -45,6 +45,11 @@ class AdvancedTab(BaseTab):
         gpu_group.setLayout(gpu_layout)
         self.add_to_layout(gpu_group)
         
+        # 连接信号：当GPU数量改变时更新工作进程状态
+        self.num_devices.valueChanged.connect(self.update_workers_state)
+        # 初始化工作进程状态
+        self.update_workers_state()
+        
         # 调试设置
         debug_group = QGroupBox("调试设置")
         debug_layout = QFormLayout()
@@ -65,6 +70,13 @@ class AdvancedTab(BaseTab):
         self.add_to_layout(debug_group)
         
         self.add_stretch()
+    
+    def update_workers_state(self):
+        """根据GPU数量启用或禁用工作进程设置"""
+        if self.num_devices.value() == 1:
+            self.num_workers.setEnabled(False)
+        else:
+            self.num_workers.setEnabled(True)
 
 def create_advanced_tab(parent):
     return AdvancedTab(parent)
